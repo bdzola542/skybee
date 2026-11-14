@@ -11,7 +11,14 @@ export const UI_LANGS = [
   ["uk", "Українська (правопис 2019)", "uk"],
   ["uk-x-1928", "Українська (харківський правопис 1928)", "uk", () => import("./i18n/uk-1928.js")],
   ["en", "English", "eu", () => import("./i18n/en.js")],
+  ["pl", "Polski", "eu", () => import("./i18n/pl.js")],
+  ["de", "Deutsch", "eu", () => import("./i18n/de.js")],
+  ["fr", "Français", "eu", () => import("./i18n/fr.js")],
+  ["es", "Español", "eu", () => import("./i18n/es.js")],
+  ["it", "Italiano", "eu", () => import("./i18n/it.js")],
 ];
+// languages of the «eu» group fall back to English where their dictionary has no line yet (not to Ukrainian)
+const EN = () => import("./i18n/en.js");
 // Soviet spellings of 1933–1990, written to bring Ukrainian closer to Russian, are deliberately not offered.
 const KEY = "skybee.ui.lang";
 const read = () => { try { return localStorage.getItem(KEY) || ""; } catch { return ""; } };
@@ -30,10 +37,12 @@ let MAX = 0; // the longest key: longer text on the page is never interface text
 async function load() {
   const entry = UI_LANGS.find(l => l[0] === uiLang);
   if (!entry?.[3]) return;
-  let d = {};
-  try { d = (await entry[3]()).default || {}; } catch { return; }
+  // both at once; if the language's own file fails (offline), English still fills in
+  const fb = entry[2] === "eu" && entry[0] !== "en";
+  const [d, en] = await Promise.all([entry[3]().then(m => m.default || {}, () => ({})), fb ? EN().then(m => m.default || {}, () => ({})) : {}]);
   const pieces = [];
-  for (const [k, v] of Object.entries(d)) {
+  // the language's own lines first; put() never overwrites, so English only fills the gaps
+  for (const [k, v] of [...Object.entries(d), ...Object.entries(en)]) {
     if (typeof v !== "string" || !v) continue;
     MAX = Math.max(MAX, k.length);
     put(k, v);
