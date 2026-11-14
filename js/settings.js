@@ -558,7 +558,7 @@ export async function help(el) {
     <div class="card"><h3>Чому немає сповіщень, коли Skybee закрито?</h3>
       <p class="small">Для справжніх push-сповіщень потрібен сервер, який стежить за мережею. Поки що Skybee показує сповіщення лише тоді, коли він відкритий (зокрема у фоновій вкладці або як встановлений застосунок).</p></div>
     <div class="card"><h3>Знайшли помилку?</h3>
-      <p class="small">Напишіть про неї на <a href="https://github.com/vysocavnu/skybee/issues" target="_blank" rel="noopener">GitHub</a> — додайте скриншот і опис, що саме сталося.</p></div>`;
+      <p class="small">Напишіть про неї на пошту <a href="mailto:skybee@ukr.net?subject=${encodeURIComponent("Помилка в Skybee")}">skybee@ukr.net</a> — додайте скриншот і опис, що саме сталося.</p></div>`;
 }
 
 /* ================= ABOUT ================= */
