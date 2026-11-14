@@ -72,7 +72,7 @@ const prof = (h) => `<a href="#/profile/${enc(h)}">@${esc(h)}</a>`;
 const ext = (u, t) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t || u.replace(/^https?:\/\//, ""))}</a>`;
 
 export async function newcomers(el) {
-  el.innerHTML = header("🌱 Для новеньких", true) + `
+  el.innerHTML = header("🌱 Для новеньких 🇺🇦", true) + `
     <div class="card"><p class="small nbauthor">Автор розділу</p>
       <div data-author><a class="rowlink" href="#/profile/bsky.one"><b>Жовтий кластер у Блакитному небі</b> <span class="muted">@bsky.one</span></a></div>
       <a class="small" href="https://bsky.app/profile/bsky.one" target="_blank" rel="noopener">bsky.app/profile/bsky.one ↗</a></div>

@@ -1216,7 +1216,7 @@ function boot() {
       // «Для новеньких»: in the menu for the first 6 months after sign-up (always reachable from Settings → Help)
       const prof = $('nav.side [data-nav="#/profile/me"]');
       if (N.isNewbie(p) && prof && !$('nav.side [data-nav="#/newcomers"]')) {
-        prof.insertAdjacentHTML("beforebegin", `<a href="#/newcomers" data-nav="#/newcomers"><span class="ni">${ico("sprout")}</span><span class="nl">Для новеньких</span></a>`);
+        prof.insertAdjacentHTML("beforebegin", `<a href="#/newcomers" data-nav="#/newcomers"><span class="ni">${ico("sprout")}</span><span class="nl">Для новеньких 🇺🇦</span></a>`);
         if (location.hash.startsWith("#/newcomers")) $('nav.side [data-nav="#/newcomers"]').classList.add("on");
       }
     }).catch(() => {});
