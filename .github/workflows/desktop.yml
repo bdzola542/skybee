@@ -194,7 +194,7 @@ jobs:
     needs: linux
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08@sha256:6ed6921bb5a9e1a916989971844f159b854b7b225880c381fa34f7a158863039 # freedesktop-26.08 (= runtime-version у маніфесті); оновлюючи — новий digest
       options: --privileged
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
