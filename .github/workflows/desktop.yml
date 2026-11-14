@@ -205,6 +205,12 @@ jobs:
       - name: Підготовка
         run: |
           cp flatpak/dl/*.tar.gz flatpak/skybee-linux-x64.tar.gz
+          # Рантайми в образі лежать у нижньому шарі overlayfs: оновлюючи їх, flatpak перейменовує теки,
+          # і це падає з «Invalid cross-device link». Копіюємо інсталяцію у верхній (записуваний) шар.
+          for d in $(flatpak --installations); do
+            [ -d "$d" ] || continue
+            cp -a "$d" "$d.rw" && rm -rf "$d" && mv "$d.rw" "$d"
+          done
       - uses: flathub-infra/flatpak-github-actions/flatpak-builder@933e9e8ca36e85046ebca8e211f0785c6becac40
         with:
           bundle: Skybee.flatpak
