@@ -98,7 +98,11 @@ function lookup(s) {
   if (r == null) {
     const a = s.match(/^[^\p{L}\p{N}«"(]+/u)?.[0] || "", b = s.slice(a.length).match(/[^\p{L}\p{N}»").!?…]+$/u)?.[0] || "";
     const mid = s.slice(a.length, s.length - b.length);
-    if ((a || b) && mid) { const x = lookup(mid); if (x != null) r = a + x + b; }
+    // «🌱 Для новеньких: … 🇺🇦»: the key may keep one of the edges («🌱 …»), so try both ways
+    if ((a || b) && mid) for (const [pre, core, post] of [["", (a + mid).trim(), b], [a, (mid + b).trim(), ""], [a, mid, b]]) {
+      if (core === s) continue;
+      const x = lookup(core); if (x != null) { const has = (e, f) => e.trim() && f(e.trim()); r = (pre && !has(pre, z => core.startsWith(z)) ? pre : "") + x + (post && !has(post, z => core.endsWith(z)) ? post : ""); break; }
+    }
   }
   if (memo.size > 5000) memo.clear();
   memo.set(s, r ?? null);
