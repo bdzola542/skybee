@@ -194,7 +194,7 @@ jobs:
     needs: linux
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-24.08
+      image: ghcr.io/flathub-infra/flatpak-github-actions:freedesktop-26.08@sha256:6ed6921bb5a9e1a916989971844f159b854b7b225880c381fa34f7a158863039 # freedesktop-26.08 (= runtime-version у маніфесті); оновлюючи — новий digest
       options: --privileged
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -205,6 +205,12 @@ jobs:
       - name: Підготовка
         run: |
           cp flatpak/dl/*.tar.gz flatpak/skybee-linux-x64.tar.gz
+          # Рантайми в образі лежать у нижньому шарі overlayfs: оновлюючи їх, flatpak перейменовує теки,
+          # і це падає з «Invalid cross-device link». Копіюємо інсталяцію у верхній (записуваний) шар.
+          for d in $(flatpak --installations); do
+            [ -d "$d" ] || continue
+            cp -a "$d" "$d.rw" && rm -rf "$d" && mv "$d.rw" "$d"
+          done
       - uses: flathub-infra/flatpak-github-actions/flatpak-builder@933e9e8ca36e85046ebca8e211f0785c6becac40
         with:
           bundle: Skybee.flatpak
