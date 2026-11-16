@@ -18,7 +18,10 @@
       <li>Your own feeds built from sources, keywords and filters</li>
       <li>Several accounts, app passwords, muted words, moderation services</li>
       <li>A media grid, a reading mode for long threads, built-in YouTube and Spotify players</li>
+      <li>System tray with desktop notifications and skybee:// links</li>
     </ul>
+    <p>Privacy: Skybee has no server of its own and no telemetry. It talks to the servers of your Bluesky account. Optional features contact third parties only when you use them: music search (Apple iTunes Search, MusicBrainz), GIF search (Tenor, with your own key), QR codes for sharing (api.qrserver.com), embedded players (YouTube, Spotify, SoundCloud, Vimeo, Twitch, Apple Music — only after you press play). Other people's Skybee profile looks are read without exposing your IP address to their servers. The app contains no generative AI.</p>
+    <p xml:lang="uk">Конфіденційність: у Skybee немає власного сервера й телеметрії. Він розмовляє лише з серверами вашого акаунта Bluesky. Необов'язкові функції звертаються до третіх сторін лише коли ви ними користуєтесь: пошук музики (Apple iTunes Search, MusicBrainz), пошук GIF (Tenor, ваш власний ключ), QR-коди (api.qrserver.com), вбудовані плеєри (лише після ▶). Оформлення чужих профілів читається так, що їхній сервер не бачить вашої IP-адреси. Застосунок не містить генеративного ШІ.</p>
   </description>
   <launchable type="desktop-id">io.github.vysocavnu.skybee.desktop</launchable>
   <url type="homepage">https://skybee.online/</url>

@@ -28,7 +28,7 @@ function look() {
   const night = (t === "system" ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark") : t) !== "light";
   // the colour of the account that signs in (its Skybee profile colour, remembered by flair.js), else the app colour
   let did = null; try { did = JSON.parse(ls("skybee.session") || "null")?.did; } catch {}
-  const c = [did && ls("skybee.pc." + did), ls("skybee.color")].find(v => /^#[0-9a-f]{6}$/i.test(v || ""))?.toLowerCase() || null;
+  const c = [ls("skybee.color"), did && ls("skybee.pc." + did)].find(v => /^#[0-9a-f]{6}$/i.test(v || ""))?.toLowerCase() || null;
   const h = c && hsl(c);
   if (h && (h.h < 16 || h.h > 340) && h.s > .4 && h.l > .2 && h.l < .8) // red: the Eclipse
     return { cls: "eclipse", vars: { "--sp-bee-hi": "#4a0c0c", "--sp-bee-lo": "#0c0000" } };

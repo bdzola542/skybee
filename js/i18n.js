@@ -28,6 +28,8 @@ const auto = () => { for (const l of navigator.languages || []) { const b = Stri
 export const uiLang = known(read()) ? read() : auto();
 export const setUiLang = (c) => { try { localStorage.setItem(KEY, c); } catch {} };
 // locale for dates and numbers (private-use tags like uk-x-1928 → uk)
+// the «Для новеньких» guide is about Ukrainian Bluesky: only for Ukrainian and its spellings/dialects
+export const isUk = UI_LANGS.find(l => l[0] === uiLang)?.[2] === "uk";
 export const locale = uiLang.split("-x-")[0];
 
 const CYR = /[А-ЯЁЇІЄҐа-яїієґ]/;

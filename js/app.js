@@ -1,5 +1,5 @@
 // Skybee — app shell, router, global actions
-import { ready } from "./i18n.js"; // the interface language: its dictionary loads before the first screen
+import { ready, isUk } from "./i18n.js"; // the interface language: its dictionary loads before the first screen
 import { errText } from "./errors.js";
 import "./splash.js"; // the welcome scene, first of all
 import { isNative, onLink } from "./native.js"; // Android/iOS app: links to the browser, the Back button, skybee:// links
@@ -415,8 +415,10 @@ async function route() {
     const want = h === "/profile/me" ? "/profile/" + api.session?.handle : h;
     a.classList.toggle("on", h === "/" ? path === "/" : path === want || path.startsWith(want + "/"));
   });
-  document.documentElement.classList.remove("tab-min", "fab-min", "scrolled"); // a new screen starts with the full bars
+  document.documentElement.classList.remove("tab-min", "fab-min", "scrolled", "feeds-hide"); // a new screen starts with the full bars
   placeLens($("nav.bottom a.on"));
+  main._grid?.abort(); main._swipe?.abort(); // the screen element is reused: the old screen's touch/click listeners go
+  flair.untint(main); // leaving a profile (or a post): its colour goes at once, not when the next screen has loaded
   main.innerHTML = "";
   main.dataset.route = path; // the pane beside it (tablets sideways) opens posts only from list screens
   document.body.classList.remove("deckmode");
@@ -545,6 +547,9 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
     const r = document.documentElement, y = scrollY, d = y - lastY; lastY = y;
     acc = Math.sign(d) === Math.sign(acc) ? acc + d : d;
     r.classList.toggle("scrolled", y > 4);
+    // the feed tabs of the home screen step away when reading down and come back at the first little scroll up
+    if (acc > 24 && y > 140) r.classList.add("feeds-hide");
+    else if (acc < -8 || y < 60) r.classList.remove("feeds-hide");
     if (r.dataset.ui === "material") {
       if (acc > 30 && y > 120) r.classList.add("fab-min");
       else if (acc < -20 || y < 60) r.classList.remove("fab-min");
@@ -635,6 +640,17 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
   new MutationObserver(soon).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
   addEventListener("change", soon); addEventListener("resize", soon); document.fonts?.ready.then(soon).catch(() => {});
 
+  // a swipe over the feed (views.js) carries the bubble between two tabs: p = 0…1 of the way from `from` to `to`
+  addEventListener("skybee:rowdrag", (e) => {
+    const { row, from, to, p, end } = e.detail, lens = row.querySelector(":scope > .rowlens");
+    if (!lens) return;
+    if (end) { lens.style.transition = ""; lens._anim?.cancel(); place(row); return; } // a cancelled swipe: back under the chosen tab
+    const a = row.querySelector(`[data-tab="${from}"]`), b = row.querySelector(`[data-tab="${to}"]`);
+    if (!a || !b) return;
+    const inset = 6, x = a.offsetLeft + (b.offsetLeft - a.offsetLeft) * p + inset, w = a.offsetWidth + (b.offsetWidth - a.offsetWidth) * p - inset * 2;
+    lens._anim?.cancel(); lens.style.transition = "none"; lens._x = x;
+    lens.style.setProperty("--lx", x + "px"); lens.style.width = w + "px";
+  }, { passive: true });
   let drag = null;
   const under = (row, x) => items(row).find(c => { const r = c.getBoundingClientRect(); return x >= r.left && x <= r.right; });
   const end = (go) => {
@@ -788,6 +804,8 @@ document.addEventListener("click", async (e) => {
     const v = t.closest("video[data-src]"); if (v) { attachVideo(v); return; }
     // card navigation (ignore clicks on links, buttons, inputs, videos)
     if (t.closest("a, button, input, textarea, select, video, label, summary, details")) return;
+    const lst = t.closest("[data-nlist]"); // «N people liked / followed»: the card opens its list of people
+    if (lst) { const d = lst.querySelector("details.nall"); if (d) d.open = !d.open; return; }
     const card = t.closest("[data-href]");
     if (card && !getSelection().toString()) { location.hash = card.dataset.href; }
     return;
@@ -1221,7 +1239,7 @@ function boot() {
       actors.set(p.did, p); const me = $(".me"); if (me) me.innerHTML = meChip(); const sp = $("#sideProf"); if (sp) sp.innerHTML = sideProfile(p);
       // «Для новеньких»: in the menu for the first 6 months after sign-up (always reachable from Settings → Help)
       const prof = $('nav.side [data-nav="#/profile/me"]');
-      if (N.isNewbie(p) && prof && !$('nav.side [data-nav="#/newcomers"]')) {
+      if (isUk && N.isNewbie(p) && prof && !$('nav.side [data-nav="#/newcomers"]')) {
         prof.insertAdjacentHTML("beforebegin", `<a href="#/newcomers" data-nav="#/newcomers"><span class="ni">${ico("sprout")}</span><span class="nl">Для новеньких 🇺🇦</span></a>`);
         if (location.hash.startsWith("#/newcomers")) $('nav.side [data-nav="#/newcomers"]').classList.add("on");
       }

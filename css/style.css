@@ -727,7 +727,7 @@ nav.side .logo, .guestbar .logo { display: flex; align-items: center; gap: 10px;
 #splash.eclipse .sp-bee { filter: drop-shadow(0 0 8px rgba(255,40,40,.9)) drop-shadow(0 0 22px rgba(160,0,0,.6)); }
 .rhead { margin: 4px 6px 2px; }
 .msg.mine .rhead { text-align: right; }
-.rquote { max-width: min(320px, 75vw); padding: 6px 10px; margin-bottom: -10px; padding-bottom: 14px; border-radius: 14px 14px 4px 4px; background: var(--hover);
+.rquote { max-width: min(320px, 75vw); padding: 6px 10px; margin-bottom: 4px; border-radius: 14px; background: var(--hover);
   border: 1px solid var(--line); font-size: 13px; cursor: pointer; display: flex; flex-direction: column; opacity: .9; }
 .rquote span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .rquote.mine { background: color-mix(in srgb, var(--accent) 35%, var(--bg)); border-color: transparent; }
@@ -1775,3 +1775,32 @@ html.lg-refract:root[data-ui="glass"] { --lg-filter: url(#lg-refract) blur(var(-
 body.detail main article.post.is-open { box-shadow: inset 3px 0 0 var(--accent); }
 article.post.kbd-on { box-shadow: inset 3px 0 0 var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 12px; }
 .kbd-help td { padding: 5px 10px 5px 0; vertical-align: top; } .kbd-help kbd { white-space: nowrap; }
+
+/* feed tabs hide while reading down, return on the first scroll up (app.js: feeds-hide) */
+#feedTabs { transition: transform .25s var(--ease-move, ease), opacity .2s; }
+html.feeds-hide #feedTabs { transform: translateY(-110%); opacity: 0; pointer-events: none; }
+html.feeds-hide .newpill { top: calc(12px + var(--sat)); }
+body.calm #feedTabs { transition: none; }
+
+/* «N people …» in notifications: the opened list of people */
+.nwho[open] > summary { margin-bottom: 6px; }
+.nwhorow { display: flex; align-items: center; gap: 10px; padding: 6px 0; color: var(--text); }
+.nwhorow .who { display: flex; flex-direction: column; min-width: 0; }
+[data-nlist] { cursor: pointer; }
+
+/* a chat: the tab bar steps away, the message bar sits at the bottom edge (no overlap with a quoted reply either) */
+body:has(.chatbar) nav.bottom { display: none !important; }
+body:has(.chatbar) .chatbar { bottom: 0 !important; }
+:root[data-ui="glass"].glass-float body:has(.chatbar) .chatbar { bottom: calc(8px + var(--sab)) !important; }
+body:has(.chatbar) .chat { padding-bottom: calc(80px + var(--sab)); }
+
+/* platform icon sets (js: ICO_GL / ICO_MT in ui.js): iOS-like for Liquid Glass, Android-like for Material, the neutral line set for Skybee */
+.ico .i-gl, .ico .i-mt { display: none; }
+:root[data-ui="glass"] .ico:has(.i-gl) .i-sb, :root[data-ui="material"] .ico:has(.i-mt) .i-sb { display: none; }
+:root[data-ui="glass"] .ico .i-gl, :root[data-ui="material"] .ico .i-mt { display: inline; }
+:root[data-ui="glass"] .ico .i-gl { stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+:root[data-ui="material"] .ico .i-mt { stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* the chosen tab is filled, as in iOS and Android */
+:root[data-ui="glass"] :is(nav.bottom, nav.side) a.on .ico .i-gl { fill: currentColor; fill-opacity: .22; stroke-width: 1.9; }
+:root[data-ui="material"] :is(nav.bottom, nav.side) a.on .ico .i-mt { fill: currentColor; fill-opacity: .9; stroke-width: 1.4; }
+:root[data-ui="material"] :is(nav.bottom, nav.side) a.on .ico .i-mt :is(circle, path[d^="M10 20"]) { fill-opacity: .9; }

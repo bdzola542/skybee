@@ -5,7 +5,7 @@ import { session } from "./api.js";
 import { bee, $, esc, name, vname, at, avatar, empty, spinner, toast, modal, confirmBox, pwa, actors, ico } from "./ui.js";
 import { header } from "./views.js";
 import { getLang } from "./compose.js";
-import { UI_LANGS, uiLang, setUiLang } from "./i18n.js";
+import { UI_LANGS, uiLang, setUiLang, isUk } from "./i18n.js";
 import * as notify from "./notify.js";
 import { inkFor, colorsOf } from "./flair.js";
 
@@ -381,7 +381,7 @@ export async function media(el) {
       <label class="field">Ключ Tenor API — для пошуку GIF<input id="tenorkey" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(store.get("skybee.tenorKey") || "")}"></label>
       <p class="small muted">Безплатний: Google Cloud Console → новий проєкт → увімкнути «Tenor API» → «Облікові дані» → «Створити ключ API». Зберігається лише на цьому пристрої.</p>
       ${toggle("postcolors", "Кольори профілів на постах", store.get("skybee.postColors") !== "0", "Пости людей з оформленням Skybee — на м'якому градієнті їхнього профілю")}
-      ${toggle("flairall", "Оформлення з власних серверів", store.get("skybee.flairAll") === "1", "Статус, музика, колір та іграшка людей, чий акаунт не на серверах Bluesky. Їхній сервер бачитиме твою IP-адресу, коли ти відкриваєш їхній профіль")}
+      <p class="small muted">🔒 Оформлення Skybee безпечне для твоєї IP-адреси: чужі записи читаються через публічний кеш, а іграшка — з CDN, тож сервер власника профілю тебе не бачить.</p>
       ${toggle("players", "Вбудовані плеєри", store.get("skybee.players") !== "0", "YouTube, Spotify, SoundCloud, Vimeo, Twitch, Apple Music грають прямо в пості — після натискання ▶")}
       ${toggle("extmedia", "Показувати картки посилань із зображеннями", store.get("skybee.noLinkThumbs") !== "1")}
     </div>`;
@@ -396,7 +396,6 @@ export async function media(el) {
   $("#autogif", el).onchange = (e) => { store.set("skybee.autogif", e.target.checked ? "1" : null); toast("Збережено"); };
   $("#tenorkey", el).onchange = (e) => { store.set("skybee.tenorKey", e.target.value.trim() || null); toast(e.target.value.trim() ? "Ключ збережено — шукай GIF кнопкою «GIF» у редакторі" : "Ключ прибрано"); };
   $("#postcolors", el).onchange = (e) => { store.set("skybee.postColors", e.target.checked ? null : "0"); toast("Збережено — діє на нових екранах"); };
-  $("#flairall", el).onchange = (e) => { store.set("skybee.flairAll", e.target.checked ? "1" : null); toast("Збережено"); };
   $("#players", el).onchange = (e) => { store.set("skybee.players", e.target.checked ? null : "0"); toast("Збережено"); };
   $("#extmedia", el).onchange = (e) => { store.set("skybee.noLinkThumbs", e.target.checked ? null : "1"); document.body.classList.toggle("nolinkthumbs", !e.target.checked); toast("Збережено"); };
 }
@@ -548,7 +547,7 @@ export async function langs(el) {
 /* ================= HELP ================= */
 export async function help(el) {
   el.innerHTML = header("Довідка", true) + `
-    <div class="sgroup">${row("#/newcomers", "help", "🌱 Для новеньких: як усе працює, українські стрічки й списки 🇺🇦")}</div>
+    ${isUk ? `<div class="sgroup">${row("#/newcomers", "help", "🌱 Для новеньких: як усе працює, українські стрічки й списки 🇺🇦")}</div>` : ""}
     <div class="card"><h3>Клавіатура</h3>
       <p><kbd>N</kbd> — новий пост<br><kbd>/</kbd> — пошук<br><kbd>Ctrl</kbd> + <kbd>Enter</kbd> — опублікувати з редактора<br><kbd>Esc</kbd> — закрити вікно</p></div>
     <div class="card"><h3>Пароль застосунку чи основний?</h3>
