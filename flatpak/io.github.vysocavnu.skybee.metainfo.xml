@@ -47,6 +47,21 @@
     <color type="primary" scheme_preference="dark">#0f1218</color>
   </branding>
   <releases>
+    <release version="0.4.0" date="2026-11-16">
+      <description>
+        <p>Feed tabs hide while reading, instant switching between feeds, groups of people in notifications, platform icon sets, six more interface languages, feed looks (compact, mosaic), privacy for other people's profile looks, music search fallback.</p>
+      </description>
+    </release>
+    <release version="0.3.1" date="2026-11-13">
+      <description>
+        <p>Beta channel, stricter APK signing, own hls.js, Chats tab.</p>
+      </description>
+    </release>
+    <release version="0.3.0" date="2026-11-13">
+      <description>
+        <p>Skybee 2.0: new design, Liquid Glass and Material Design, app colour, swipe back, phone in landscape.</p>
+      </description>
+    </release>
     <release version="0.2.2" date="2026-11-12">
       <description>
         <p>New icon: the golden bee on a white background.</p>
