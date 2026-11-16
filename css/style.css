@@ -790,10 +790,9 @@ nav.side::-webkit-scrollbar, .tabs::-webkit-scrollbar, .nchips::-webkit-scrollba
   .imgs.n2 img, .imgs.n3 img, .imgs.n4 img { max-height: 46vh; }
 }
 
-/* swipe back from the left edge in the apps (js/native.js) */
-.swipeback { position: fixed; left: 0; z-index: 90; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; pointer-events: none;
-  background: var(--panel); color: var(--text); border: 1px solid var(--line); font-size: 20px; box-shadow: 0 4px 16px rgba(0,0,0,.35); transition: background .12s, color .12s; }
-.swipeback.ready { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+/* the feed tabs of the home screen stay under the top bar while the feed scrolls (js/views.js sets --tbh to the bar's height) */
+body.guest #feedTabs { top: calc(var(--tbh, 54px) + 49px); }
+#feedTabs { position: sticky; top: var(--tbh, 54px); z-index: 9; background: color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 
 /* =====================================================================
    Skybee 2.0 — «The Social Hive»: the same screens and classes, a look of its own.

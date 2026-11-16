@@ -492,7 +492,8 @@ export function menu(anchor, items) {
   });
 }
 
-// Photo viewer: a click (or double tap) zooms in where you point, the wheel zooms smoothly, a zoomed photo is dragged around.
+// Photo viewer: a double tap (or double click) zooms in where you point, two fingers or the wheel zoom smoothly, a zoomed photo is dragged around,
+// an unzoomed one is swiped sideways to the next photo.
 // ⬇ saves the full-size file; ✕, Esc or a click beside the photo closes it
 export function lightbox(urls, i = 0, alts = []) {
   const m = modal(`<div class="lb"><div class="lb-bar"><span class="lb-n small"></span><div class="grow"></div>
@@ -515,13 +516,54 @@ export function lightbox(urls, i = 0, alts = []) {
   show();
   m.querySelector(".lb-prev")?.addEventListener("click", () => { i = (i - 1 + urls.length) % urls.length; show(); });
   m.querySelector(".lb-next")?.addEventListener("click", () => { i = (i + 1) % urls.length; show(); });
-  let moved = false, drag = null;
-  img.addEventListener("pointerdown", (e) => { moved = false; if (z > 1) { drag = { sx: e.clientX - x, sy: e.clientY - y }; img.setPointerCapture(e.pointerId); } });
-  img.addEventListener("pointermove", (e) => { if (!drag) return; moved = true; x = e.clientX - drag.sx; y = e.clientY - drag.sy; apply(); });
-  img.addEventListener("pointerup", () => { drag = null; });
-  img.addEventListener("click", (e) => { if (moved) return; z > 1 ? reset() : zoomAt(2.5, e.clientX, e.clientY); });
+  // Fingers and mouse: two fingers pinch, a double tap (or double click) zooms in where you tap and out again, a zoomed photo is dragged,
+  // an unzoomed one is swiped sideways to the next or previous photo. A single tap does nothing (a tap beside the photo closes it).
+  let moved = false, tapAt = 0, tapX = 0, tapY = 0, swipe = null, pinch = null;
+  const ptr = new Map();
+  const mid = () => { const [a, b] = [...ptr.values()]; return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) || 1 }; };
+  const go = (n) => { i = (i + n + urls.length) % urls.length; show(); };
+  let bare = false; // the finger went down beside the photo (pointer capture would make every click look like one on the stage)
+  stage.addEventListener("pointerdown", (e) => {
+    if (!ptr.size) bare = e.target === stage;
+    ptr.set(e.pointerId, { x: e.clientX, y: e.clientY }); stage.setPointerCapture?.(e.pointerId);
+    if (ptr.size === 1) { moved = false; swipe = z > 1 ? { px: e.clientX - x, py: e.clientY - y, pan: true } : { sx: e.clientX, sy: e.clientY, dx: 0 }; img.style.transition = "none"; }
+    if (ptr.size === 2) { const m2 = mid(); pinch = { d: m2.d, z, mx: m2.x, my: m2.y }; swipe = null; moved = true; }
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!ptr.has(e.pointerId)) return;
+    ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && ptr.size >= 2) {
+      const m2 = mid();
+      x += m2.x - pinch.mx; y += m2.y - pinch.my; pinch.mx = m2.x; pinch.my = m2.y; // the fingers also carry the photo
+      zoomAt(pinch.z * m2.d / pinch.d, m2.x, m2.y);
+      return;
+    }
+    if (!swipe) return;
+    if (swipe.pan) { moved = true; x = e.clientX - swipe.px; y = e.clientY - swipe.py; apply(); return; }
+    swipe.dx = e.clientX - swipe.sx;
+    if (Math.abs(swipe.dx) > 8 || Math.abs(e.clientY - swipe.sy) > 8) moved = true;
+    if (urls.length > 1) img.style.transform = `translate(${swipe.dx}px, 0) scale(1)`;
+  });
+  const lift = (e) => {
+    if (!ptr.delete(e.pointerId)) return;
+    if (ptr.size === 1 && pinch) { // one finger stays: carry on dragging from where it is
+      const [r] = [...ptr.values()]; pinch = null; swipe = z > 1 ? { px: r.x - x, py: r.y - y, pan: true } : null;
+      if (z <= 1.02) reset();
+      return;
+    }
+    if (ptr.size) return;
+    const sw = swipe; swipe = null; pinch = null; img.style.transition = "";
+    if (sw && !sw.pan && urls.length > 1 && Math.abs(sw.dx) > 60) { go(sw.dx < 0 ? 1 : -1); return; }
+    if (sw && !sw.pan) apply(); // not far enough: back to the middle
+    if (moved || e.type === "pointercancel") return;
+    // a tap: the second one close to the first in time and place is a double tap
+    const now = Date.now();
+    if (now - tapAt < 320 && Math.hypot(e.clientX - tapX, e.clientY - tapY) < 36) { tapAt = 0; z > 1 ? reset() : zoomAt(2.5, e.clientX, e.clientY); }
+    else { tapAt = now; tapX = e.clientX; tapY = e.clientY; }
+  };
+  stage.addEventListener("pointerup", lift); stage.addEventListener("pointercancel", lift);
   stage.addEventListener("wheel", (e) => { e.preventDefault(); zoomAt(z * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY); }, { passive: false });
-  stage.addEventListener("click", (e) => { if (e.target === stage) m.close(); });
+  stage.addEventListener("click", (e) => { if (bare && !moved) m.close(); });
   const arrows = (e) => {
     if (!m.isConnected) return document.removeEventListener("keydown", arrows);
     if (e.key === "ArrowLeft") m.querySelector(".lb-prev")?.click();
@@ -533,6 +575,11 @@ export function lightbox(urls, i = 0, alts = []) {
     const url = urls[i];
     try {
       const blob = await (await fetch(url)).blob();
+      // phones (and WebViews, where a download link does nothing): the system share sheet has «Save image»
+      if (matchMedia("(pointer: coarse)").matches && navigator.canShare) {
+        const file = new File([blob], "skybee-photo." + ({ "image/png": "png", "image/webp": "webp", "image/gif": "gif" }[blob.type] || "jpg"), { type: blob.type || "image/jpeg" });
+        if (navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file] }); return; } catch (ex) { if (ex?.name === "AbortError") return; } } // refused (the fetch took too long for a tap): the download below
+      }
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       // the extension follows the picture's type, but only a picture's: a server could call anything «text/html»
@@ -567,7 +614,7 @@ export async function attachVideo(video) {
   try { await loadHls(); hlsOk = window.Hls?.isSupported(); } catch {}
   if (!hlsOk) {
     if (video.canPlayType("application/vnd.apple.mpegurl")) { video.src = src; play(); }
-    else videoError(video);
+    else videoError(video, "hls-unsupported");
     return;
   }
   const hls = new window.Hls({ subtitleDisplay: true });
@@ -584,13 +631,19 @@ export async function attachVideo(video) {
     if (!d.fatal) return;
     if (d.type === window.Hls.ErrorTypes.MEDIA_ERROR && !retried) { retried = true; hls.recoverMediaError(); return; }
     if (d.type === window.Hls.ErrorTypes.NETWORK_ERROR && !retried) { retried = true; hls.startLoad(); return; }
-    hls.destroy(); videoError(video);
+    hls.destroy();
+    // the browser's own player is the last resort where it can play HLS (Safari, iPhone, some WebViews)
+    if (video.canPlayType("application/vnd.apple.mpegurl")) { video.src = src; play(); video.addEventListener("error", () => videoError(video, "media" + (video.error?.code || "")), { once: true }); return; }
+    videoError(video, [d.type, d.details, d.response?.code].filter(Boolean).join("/"));
   });
   hls.loadSource(src); hls.attachMedia(video);
 }
-function videoError(video) {
+function videoError(video, code = "") {
   video.dataset.ready = "";
-  video.closest(".video")?.insertAdjacentHTML("beforeend", `<div class="verr">Не вдалося відтворити відео. <button class="linklike" data-act="retryVideo">Спробувати ще</button></div>`);
+  const box = video.closest(".video");
+  box?.querySelector(".verr")?.remove();
+  // the technical code (what hls.js or the browser said) tells the usual causes apart: a removed file, a blocked server, a codec
+  box?.insertAdjacentHTML("beforeend", `<div class="verr">Не вдалося відтворити відео${/(^|\/)(40[34]|410)$/.test(code) ? " — схоже, файл видалено або недоступний" : ""}. <button class="linklike" data-act="retryVideo">Спробувати ще</button>${code ? ` <span class="muted small">(${esc(code)})</span>` : ""}</div>`);
 }
 
 /* ---------- infinite scroll ---------- */

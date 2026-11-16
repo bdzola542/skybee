@@ -50,6 +50,8 @@ function clean(v) {
   return Object.keys(out).length ? out : null;
 }
 
+// The launch animation (js/splash.js) runs before anything is loaded: it reads the colour of the signed-in account from here
+function rememberColor(did, c) { try { c ? localStorage.setItem("skybee.pc." + did, c) : localStorage.removeItem("skybee.pc." + did); } catch {} }
 const flairAll = () => { try { return localStorage.getItem("skybee.flairAll") === "1"; } catch { return false; } };
 export function load(did) {
   if (!cache.has(did)) cache.set(did, (async () => {
@@ -58,8 +60,9 @@ export function load(did) {
     // someone else's own server would see the IP and the time of everyone opening their profile: only on request
     if (did !== api.session?.did && !api.bskyHost(pds) && !flairAll()) return null;
     const r = await fetch(`${pds}/xrpc/com.atproto.repo.getRecord?repo=${encodeURIComponent(did)}&collection=${NSID}&rkey=self`);
-    if (!r.ok) return null; // no record: this person has no Skybee look
+    if (!r.ok) { if (r.status === 400 || r.status === 404) rememberColor(did, null); return null; } // no record: this person has no Skybee look
     const rec = clean((await r.json()).value);
+    if (did === api.session?.did) rememberColor(did, rec?.color);
     return rec && { rec, pds };
   })().catch(() => null));
   return cache.get(did);
@@ -77,13 +80,29 @@ function togglePreview(btn, src) {
   if (mine) return;
   audio = new Audio(src);
   audio.onended = audio.onerror = stopAudio;
+  audio.ontimeupdate = () => { if (!btn.isConnected) stopAudio(); }; // the card is gone (a window closed, a screen changed): the sound goes with it
   audio.play().catch(stopAudio);
   btn.classList.add("on"); btn.textContent = "⏸";
 }
 const trackCard = (m, cls = "") => `<div class="sb-music ${cls}">
   ${m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy">` : `<span class="sb-note">🎵</span>`}
-  <a class="grow" href="${esc(m.url)}" target="_blank" rel="noopener" title="Відкрити в стрімінговому сервісі"><b class="clip">${esc(m.title)}</b><span class="muted small clip">${esc(m.artist || "Музика")}</span></a>
+  <a class="grow sb-song" href="${esc(m.url)}" target="_blank" rel="noopener" data-title="${esc(m.title)}" data-artist="${esc(m.artist || "")}" title="Слухати в стрімінговому сервісі"><b class="clip">${esc(m.title)}</b><span class="muted small clip">${esc(m.artist || "Музика")}</span></a>
   ${m.preview ? `<button type="button" class="sb-play" data-preview="${esc(m.preview)}" title="Послухати уривок">▶</button>` : `<a class="sb-play" href="${esc(m.url)}" target="_blank" rel="noopener" title="Слухати">▶</a>`}</div>`;
+// A tap on the song itself (not on ▶): which service to listen in. Each opens a search for «artist title», so it works with any track
+function streamPicker(title, artist, url) {
+  const q = encodeURIComponent(`${artist} ${title}`.trim());
+  const S = [["Spotify", `https://open.spotify.com/search/${q}`], ["Apple Music", `https://music.apple.com/search?term=${q}`],
+    ["YouTube Music", `https://music.youtube.com/search?q=${q}`], ["Deezer", `https://www.deezer.com/search/${q}`]];
+  const m = modal(`<h3>Слухати в…</h3><p class="muted small noi18n">${esc(artist ? artist + " — " : "")}${esc(title)}</p>
+    <div style="display:flex;flex-direction:column;gap:8px">${S.map(([n, u]) => `<a class="btn ghost" href="${esc(u)}" target="_blank" rel="noopener">${n}</a>`).join("")}
+    ${url ? `<a class="ghost small" href="${esc(url)}" target="_blank" rel="noopener">Відкрити за посиланням профілю</a>` : ""}</div>
+    <div class="row end"><button class="ghost" data-x="0">Закрити</button></div>`);
+  m.addEventListener("click", (e) => { if (e.target.closest("[data-x], a")) m.close(); });
+}
+document.addEventListener("click", (e) => {
+  const a = e.target.closest(".sb-music:not(.flat) a.sb-song");
+  if (a) { e.preventDefault(); streamPicker(a.dataset.title, a.dataset.artist, a.getAttribute("href")); }
+});
 // delegated: works for cards on the profile and inside the editor
 document.addEventListener("click", (e) => { const b = e.target.closest(".sb-play[data-preview]"); if (b) togglePreview(b, b.dataset.preview); });
 
@@ -281,7 +300,7 @@ export async function edit(onDone) {
     <label class="field">Іграшка — фото, яке сидітиме на банері (найкраще PNG з прозорим тлом)<input type="file" accept="image/*" data-f="toy"></label>
     ${cur.toy ? `<label class="row small"><input type="checkbox" data-f="notoy" style="width:auto"> прибрати іграшку</label>` : ""}
     <p class="err"></p>
-    <div class="row end"><button class="ghost" data-x="0">Скасувати</button><button class="btn" data-x="1">Зберегти</button></div>`);
+    <div class="row end"><button class="ghost" data-x="0">Скасувати</button><button class="btn" data-x="1">Зберегти</button></div>`, { onClose: stopAudio }); // closing the window stops the preview
   const f = (k) => m.querySelector(`[data-f=${k}]`);
   const err = m.querySelector(".err");
   const drawColor = () => {

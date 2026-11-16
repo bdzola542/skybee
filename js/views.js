@@ -97,6 +97,8 @@ export const forgetHomeTabs = () => { tabsCache = null; };
 
 export async function home(el) {
   el.innerHTML = `<div class="topbar">${MENU_BTN}<h2 class="brand">${bee(28)} Skybee</h2><div class="grow"></div>${gridBtn("home")}<button class="ghost icon" data-act="refresh" title="Оновити">↻</button></div><div class="tabs" id="feedTabs"></div><div id="feedBody"></div>`;
+  const bar = $(".topbar", el); // the feed tabs stick right under it
+  if (bar) new ResizeObserver(() => el.style.setProperty("--tbh", bar.offsetHeight + "px")).observe(bar);
   const tabs = await homeTabs();
   let sel = 0; try { sel = Math.min(+sessionStorage.getItem("skybee.tab") || 0, tabs.length - 1); } catch {}
   const tabEl = $("#feedTabs", el), body = $("#feedBody", el);
