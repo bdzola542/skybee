@@ -1828,3 +1828,16 @@ body.fl-mosaic .tiles .tile { display: block; }
 #feedTabs + .newpill { top: calc(var(--tbh, 54px) + var(--tabh, 0px) + 10px); }
 @media (pointer: coarse) { .nchips + * { touch-action: pan-y; } } /* sideways on the notifications list switches the filter (views.js) */
 html.feeds-hide #feedTabs + .newpill { top: calc(var(--tbh, 54px) + 10px); }
+/* ---------- phone sideways: the menu reaches the left edge of the phone;
+   its icons and labels stay clear of the notch / Dynamic Island (--sal) ---------- */
+@media (orientation: landscape) and (max-height: 500px) and (min-width: 641px) {
+  #app { padding-left: 0; grid-template-columns: calc(168px + var(--sal)) minmax(0, 1fr) 236px; }
+  body.deckmode #app { grid-template-columns: calc(168px + var(--sal)) minmax(0, 1fr); }
+  nav.side { padding-left: calc(8px + var(--sal)); }
+  :root[data-ui="glass"] nav.side { border-left: 0; border-radius: 0 28px 28px 0; }
+  :root[data-ui="material"] nav.side { border-radius: 0 16px 16px 0; }
+}
+@media (orientation: landscape) and (max-height: 500px) and (min-width: 641px) and (max-width: 780px) {
+  #app { grid-template-columns: calc(60px + var(--sal)) minmax(0, 1fr) 220px; }
+  body.deckmode #app { grid-template-columns: calc(60px + var(--sal)) minmax(0, 1fr); }
+}
