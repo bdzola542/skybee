@@ -623,7 +623,7 @@ const INSTALL = [
   { id: "android", icon: "🤖", name: "Android", note: "Файл APK — дозволь встановлення з браузера", re: /\.apk$/i },
   { id: "ios", icon: "🍎", name: "iPhone / iPad", note: "IPA без підпису — встанови через Sideloadly чи AltStore", re: /\.ipa$/i },
   { id: "appimage", icon: "🐧", name: "Linux — AppImage", note: "Один файл, оновлюється сам", re: /\.AppImage$/i },
-  { id: "flatpak", icon: "📦", name: "Linux — Flatpak", note: "flatpak install --user Skybee.flatpak", re: /\.flatpak$/i },
+  { id: "flatpak", icon: "📦", name: "Linux — Flatpak", note: "flatpak remote-add --user skybee https://skybee.online/flatpak/skybee.flatpakrepo && flatpak install --user skybee io.github.vysocavnu.skybee", re: /\.flatpak$/i },
   { id: "tar", icon: "🗜️", name: "Linux — tar.gz", note: "Архів, розпакуй і запусти skybee", re: /linux-x64\.tar\.gz$/i },
 ];
 let latestAssets = null; // cached for the session: [{name, browser_download_url}]
@@ -708,7 +708,7 @@ export async function about(el) {
         available: `Вийшла нова ${r.beta ? "бета-версія" : "версія"}: ${r.version}. ${cap()?.getPlatform?.() === "ios" ? "Встанови IPA через Sideloadly чи AltStore." : "Встанови її поверх — акаунти й налаштування залишаться."}`,
         downloading: `Знайдено версію ${r.version}. Вона завантажується у фоні (прогрес — на значку в панелі задач); коли буде готова, Skybee запропонує перезапуститися.`,
         ready: `Версія ${r.version} вже завантажена — перезапусти Skybee, щоб її встановити.`,
-        flatpak: "Цю версію оновлює Flathub: відкрий «Програми» (GNOME Software чи Discover) або виконай flatpak update.",
+        flatpak: "Цю версію оновлює Flatpak (якщо встановлена через репозиторій skybee): відкрий «Програми» (GNOME Software чи Discover) або виконай flatpak update.",
         manual: "Ця збірка не оновлюється сама — завантаж нову версію зі сторінки релізів Skybee на GitHub.",
         dev: "Skybee запущено з вихідного коду — оновлення вимкнені.",
         error: `Не вдалося перевірити оновлення. Перевір підключення до інтернету й спробуй ще раз пізніше. (${r.code || "network"})`,
