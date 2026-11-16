@@ -503,7 +503,12 @@ export function lightbox(urls, i = 0, alts = []) {
   m.classList.add("dark");
   const img = m.querySelector("img"), alt = m.querySelector(".alt"), stage = m.querySelector(".lb-stage");
   let z = 1, x = 0, y = 0;
-  const apply = () => { img.style.transform = `translate(${x}px, ${y}px) scale(${z})`; img.classList.toggle("zoomed", z > 1); };
+  const apply = () => {
+    if (z > 1) { // the photo cannot be dragged off the screen: its edge stops at the edge of the window
+      const r = stage.getBoundingClientRect(), mx = Math.max(0, (img.offsetWidth * z - r.width) / 2), my = Math.max(0, (img.offsetHeight * z - r.height) / 2);
+      x = Math.min(mx, Math.max(-mx, x)); y = Math.min(my, Math.max(-my, y));
+    }
+    img.style.transform = `translate(${x}px, ${y}px) scale(${z})`; img.classList.toggle("zoomed", z > 1); };
   const reset = () => { z = 1; x = 0; y = 0; apply(); };
   const zoomAt = (nz, cx, cy) => { // keep the point under the cursor in place
     nz = Math.min(6, Math.max(1, nz));
@@ -512,7 +517,10 @@ export function lightbox(urls, i = 0, alts = []) {
     if (z === 1) { x = 0; y = 0; }
     apply();
   };
-  const show = () => { img.src = urls[i]; alt.textContent = alts[i] || ""; m.querySelector(".lb-n").textContent = urls.length > 1 ? `${i + 1} / ${urls.length}` : ""; reset(); };
+  const show = () => { img.src = urls[i]; alt.textContent = alts[i] || ""; m.querySelector(".lb-n").textContent = urls.length > 1 ? `${i + 1} / ${urls.length}` : ""; reset(); ready = fetchBlob(urls[i]); };
+  // the file is fetched in advance (it is already in the cache from showing it), so ⬇ can open the share sheet right inside the tap — iPhone refuses it after a wait
+  const fetchBlob = (u) => matchMedia("(pointer: coarse)").matches ? fetch(u).then(r => r.ok ? r.blob() : null).then(b => (b && /^image\//.test(b.type) ? b : null)).catch(() => null) : null;
+  let ready = null;
   show();
   m.querySelector(".lb-prev")?.addEventListener("click", () => { i = (i - 1 + urls.length) % urls.length; show(); });
   m.querySelector(".lb-next")?.addEventListener("click", () => { i = (i + 1) % urls.length; show(); });
@@ -573,18 +581,17 @@ export function lightbox(urls, i = 0, alts = []) {
   m.querySelector("[data-lb=close]").addEventListener("click", () => m.close());
   m.querySelector("[data-lb=save]").addEventListener("click", async () => {
     const url = urls[i];
+    const extOf = (t) => ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif" }[t] || "jpg"); // only a picture's type: a server could call anything «text/html»
     try {
-      const blob = await (await fetch(url)).blob();
-      // phones (and WebViews, where a download link does nothing): the system share sheet has «Save image»
+      const blob = (await ready) || await (await fetch(url)).blob();
+      // phones (and WebViews, where a download link does nothing): the system sheet has «Save image» / «Save to Photos»
       if (matchMedia("(pointer: coarse)").matches && navigator.canShare) {
-        const file = new File([blob], "skybee-photo." + ({ "image/png": "png", "image/webp": "webp", "image/gif": "gif" }[blob.type] || "jpg"), { type: blob.type || "image/jpeg" });
-        if (navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file] }); return; } catch (ex) { if (ex?.name === "AbortError") return; } } // refused (the fetch took too long for a tap): the download below
+        const file = new File([blob], "skybee-photo." + extOf(blob.type), { type: blob.type || "image/jpeg" });
+        if (navigator.canShare({ files: [file] })) { try { await navigator.share({ files: [file] }); return; } catch (ex) { if (ex?.name === "AbortError") return; } }
       }
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      // the extension follows the picture's type, but only a picture's: a server could call anything «text/html»
-      const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif" }[blob.type] || "jpg";
-      a.download = `skybee-${url.split("/").pop().split("@")[0].replace(/[^\w-]/g, "").slice(-16)}.${ext}`;
+      a.download = `skybee-${url.split("/").pop().split("@")[0].replace(/[^\w-]/g, "").slice(-16)}.${extOf(blob.type)}`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     } catch { window.open(url, "_blank"); } // the server did not allow reading it here: the browser saves it from a new tab
