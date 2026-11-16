@@ -615,12 +615,60 @@ export async function help(el) {
 
 /* ================= ABOUT ================= */
 const cap = () => window.Capacitor;
+
+// «Встановити як застосунок» on the site: pick a device, get the file from the newest GitHub release
+const RELEASES = "https://github.com/vysocavnu/skybee/releases/latest";
+const INSTALL = [
+  { id: "windows", icon: "🪟", name: "Windows", note: "Інсталятор .exe — оновлюється сам", re: /setup\.exe$/i },
+  { id: "android", icon: "🤖", name: "Android", note: "Файл APK — дозволь встановлення з браузера", re: /\.apk$/i },
+  { id: "ios", icon: "🍎", name: "iPhone / iPad", note: "IPA без підпису — встанови через Sideloadly чи AltStore", re: /\.ipa$/i },
+  { id: "appimage", icon: "🐧", name: "Linux — AppImage", note: "Один файл, оновлюється сам", re: /\.AppImage$/i },
+  { id: "flatpak", icon: "📦", name: "Linux — Flatpak", note: "flatpak install --user Skybee.flatpak", re: /\.flatpak$/i },
+  { id: "tar", icon: "🗜️", name: "Linux — tar.gz", note: "Архів, розпакуй і запусти skybee", re: /linux-x64\.tar\.gz$/i },
+];
+let latestAssets = null; // cached for the session: [{name, browser_download_url}]
+function latestRelease() {
+  latestAssets ||= fetch("https://api.github.com/repos/vysocavnu/skybee/releases/latest")
+    .then((r) => r.ok ? r.json() : Promise.reject(r.status))
+    .then((j) => (j.assets || []).filter((a) => /^https:\/\/github\.com\//.test(a.browser_download_url)))
+    .catch(() => { latestAssets = null; return []; });
+  return latestAssets;
+}
+export function installDialog() {
+  const here = devicePlatform(), ua = navigator.userAgent || "";
+  const mine = here === "android" ? "android" : here === "ios" ? "ios" : /windows/i.test(ua) ? "windows" : /linux/i.test(ua) ? "appimage" : "";
+  const list = [...INSTALL].sort((a, b) => (b.id === mine) - (a.id === mine));
+  const m = modal(`<h3>Встановити Skybee</h3>
+    <p class="small muted">Обери пристрій — завантажиться остання версія.</p>
+    ${pwa.install ? `<button class="instpick" data-pwa><span class="ii">🌐</span><span><b>У цьому браузері</b><small>Окреме вікно без завантаження файлів</small></span></button>` : ""}
+    ${list.map((o) => `<a class="instpick${o.id === mine ? " mine" : ""}" data-id="${o.id}" href="${RELEASES}" target="_blank" rel="noopener">
+      <span class="ii">${o.icon}</span><span><b>${esc(o.name)}${o.id === mine ? ' <i class="tag">цей пристрій</i>' : ""}</b><small>${esc(o.note)}</small></span></a>`).join("")}
+    ${/macintosh/i.test(ua) && here !== "ios" ? `<p class="small muted">Для Mac окремої версії ще немає — встанови Skybee як застосунок через браузер (Chrome, Edge або Safari: «Додати в Dock»).</p>` : ""}
+    ${here === "ios" ? `<p class="small muted">Або без файлів: «Поділитися» → «На початковий екран» у Safari.</p>` : ""}
+    <p class="small muted"><a href="${RELEASES}" target="_blank" rel="noopener">Усі файли й версії на GitHub</a></p>
+    <div class="row end"><button class="ghost" data-x>Закрити</button></div>`);
+  latestRelease().then((assets) => {
+    for (const a of m.querySelectorAll(".instpick[data-id]")) {
+      const f = assets.find((x) => INSTALL.find((o) => o.id === a.dataset.id).re.test(x.name));
+      if (f) a.href = f.browser_download_url; // otherwise the release page stays
+    }
+  });
+  m.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-x]")) return m.close();
+    if (e.target.closest("[data-pwa]")) {
+      const p = pwa.install; pwa.install = null; m.close();
+      if (p) { p.prompt(); await p.userChoice.catch(() => {}); }
+      return;
+    }
+    if (e.target.closest(".instpick[data-id]")) setTimeout(() => m.close(), 0);
+  });
+}
 export async function about(el) {
   el.innerHTML = header("Про Skybee", true) + `
     <div class="card center"><div class="aboutbee">${bee(110)}</div><h3>Skybee</h3>
       <p class="small muted">Відкритий клієнт для Bluesky. Без реклами, без трекерів, без збирання даних: усе зберігається у вашому акаунті Bluesky або в цьому браузері.</p>
       <a class="ghost sm" href="https://github.com/vysocavnu/skybee" target="_blank" rel="noopener">Код на GitHub</a>
-      <button class="btn sm" data-act="install" ${pwa.install ? "" : "hidden"}>📲 Встановити як застосунок</button></div>
+      ${window.skybeeDesktop || isNative || matchMedia("(display-mode: standalone)").matches ? "" : `<button class="btn sm" data-act="install">📲 Встановити як застосунок</button>`}</div>
     ${window.skybeeDesktop?.update || isNative ? `<div class="card"><h3>Оновлення</h3>
       <p class="small muted" id="appver">Версія застосунку: …</p>
       <div id="betabox" hidden>${toggle("beta", "Бета-тестування", false, "Нові версії Skybee раніше за всіх — з кожною зміною в коді. Можуть траплятися помилки: пиши про них на GitHub. Якщо вимкнеш, залишишся на беті, доки не вийде новіша звичайна версія.")}</div>
@@ -632,6 +680,7 @@ export async function about(el) {
       <p class="small muted">Допомагає, якщо після оновлення щось виглядає дивно. Акаунти й налаштування залишаться.</p>
       <button class="ghost sm danger" id="resetlocal">Скинути налаштування цього пристрою</button>
       <p class="small muted">Тема, розмір тексту, мови й чернетка повернуться до початкових. Акаунти й налаштування в акаунті Bluesky не зміняться.</p></div>`;
+  if ($("[data-act=install]", el)) latestRelease(); // the file links are ready by the time the dialog opens
   const chk = $("#checkupd", el);
   if (chk) {
     const res = $("#updres", el), get = $("#getupd", el), ver = $("#appver", el);
