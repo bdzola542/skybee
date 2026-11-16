@@ -1,7 +1,7 @@
 {
   "name": "skybee",
   "productName": "Skybee",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Skybee — відкритий клієнт для Bluesky",
   "author": {
     "name": "vysocavnu",
