@@ -16,6 +16,7 @@ import { bee, isLive, $, esc, calmMotion, posts, actors, pwa, toast, menu, confi
 import { openComposer, openGateEditor } from "./compose.js";
 
 try { S.applyLook(); } catch {}
+try { import("./appicon.js").then(m => m.applyIcon()); } catch {}
 matchMedia("(prefers-color-scheme: light)").addEventListener?.("change", () => S.applyLook()); // «as in the system» follows the OS live
 
 const app = $("#app");

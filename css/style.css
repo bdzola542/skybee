@@ -1849,3 +1849,11 @@ html.feeds-hide #feedTabs + .newpill { top: calc(var(--tbh, 54px) + 10px); }
   #app { grid-template-columns: calc(60px + var(--sal)) minmax(0, 1fr) 220px; }
   body.deckmode #app { grid-template-columns: calc(60px + var(--sal)) minmax(0, 1fr); }
 }
+
+/* app icon picker: each tile shows the icon itself */
+.sb-icons { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0 4px; }
+.sb-ic { width: 56px; height: 56px; padding: 0; border: 2px solid var(--line); border-radius: 14px; background: none; overflow: hidden; display: grid; place-items: center; cursor: pointer; position: relative; }
+.sb-ic img { width: 100%; height: 100%; display: block; }
+.sb-ic.on { outline: 3px solid var(--accent); outline-offset: 3px; }
+.sb-ic.sb-any { background: var(--bg); color: var(--muted); font-size: 22px; }
+.sb-ic.sb-any input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
