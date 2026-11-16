@@ -4,7 +4,7 @@
 // російською, бо «Джиган» = Dzhyhan = Dzhigan). Трек з кількома виконавцями (feat., &, x) — позиція кожного по черзі.
 import { esc } from "./ui.js";
 
-const SITE = "https://vysocavnu.github.io/skybee/"; // the apps read the file from the site: always the newest
+const SITE = "https://skybee.online/"; // the apps read the file from the site: always the newest
 export const SOURCE = "https://starsaboutwar.in.ua";
 export const STATUS = {
   za: { t: "Підтримує війну", cls: "za", icon: "🔴" },
@@ -28,7 +28,7 @@ let ready = null;
 // → { find(name) → entry | null } ; entry: { slug, status, names, excerpt, url }
 export function stars() {
   return ready ||= (async () => {
-    const url = location.protocol.startsWith("http") ? "data/stars.json" : SITE + "data/stars.json";
+    const url = location.protocol.startsWith("http") && location.hostname !== "localhost" ? "data/stars.json" : SITE + "data/stars.json";
     const r = await fetch(url);
     if (!r.ok) throw new Error("stars " + r.status);
     const d = await r.json();

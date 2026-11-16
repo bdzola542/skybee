@@ -82,7 +82,7 @@ export function num(n = 0) {
   if (n < 1e6) return (n / 1000).toFixed(n < 1e4 ? 1 : 0).replace(/\.0$/, "") + " тис.";
   return (n / 1e6).toFixed(1).replace(/\.0$/, "") + " млн";
 }
-// «@lejk309» instead of «@lejk309.bsky.social»; other domains stay whole. Escaped, ready for HTML
+// «@user» instead of «@user.bsky.social»; other domains stay whole. Escaped, ready for HTML
 export const shortHandle = (h = "") => h.replace(/\.bsky\.social$/i, "");
 export const at = (h) => "@" + esc(shortHandle(h));
 export const name = (a) => `<bdi class="noi18n">${esc(a?.displayName || a?.handle || "")}</bdi>`; // people's names are never translated (i18n.js)
