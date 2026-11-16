@@ -1804,3 +1804,17 @@ body:has(.chatbar) .chat { padding-bottom: calc(80px + var(--sab)); }
 :root[data-ui="glass"] :is(nav.bottom, nav.side) a.on .ico .i-gl { fill: currentColor; fill-opacity: .22; stroke-width: 1.9; }
 :root[data-ui="material"] :is(nav.bottom, nav.side) a.on .ico .i-mt { fill: currentColor; fill-opacity: .9; stroke-width: 1.4; }
 :root[data-ui="material"] :is(nav.bottom, nav.side) a.on .ico .i-mt :is(circle, path[d^="M10 20"]) { fill-opacity: .9; }
+
+/* «Вигляд стрічки» (Налаштування → Оформлення): компактний список і мозаїка */
+body.fl-compact .post { padding: 6px 12px; gap: 8px; }
+body.fl-compact .post .avatar { width: 32px !important; height: 32px !important; }
+body.fl-compact .post .imgs { max-height: 130px; overflow: hidden; }
+body.fl-compact .post .ext img, body.fl-compact .post .ext .thumb { display: none; }
+body.fl-compact .post .text { font-size: .94em; line-height: 1.35; }
+body.fl-mosaic .tiles { display: block; column-count: 3; column-gap: 3px; }
+body.fl-mosaic .tiles .tile { aspect-ratio: 1; break-inside: avoid; margin-bottom: 3px; }
+body.fl-mosaic .tiles .tile:nth-child(3n+1) { aspect-ratio: 3 / 4; }
+body.fl-mosaic .tiles .tile:nth-child(3n+2) { aspect-ratio: 1; }
+body.fl-mosaic .tiles .tile:nth-child(3n) { aspect-ratio: 4 / 5; }
+body.fl-mosaic .dbody .tiles { column-count: 2; }
+body.fl-mosaic .tiles .tile { display: block; }
