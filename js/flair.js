@@ -21,7 +21,7 @@ const isColor = (c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c);
 const isHttps = (u) => typeof u === "string" && /^https:\/\/[^\s"'<>]+$/i.test(u);
 // Covers and previews load by themselves when a profile is opened, so they may only come from the music services' own
 // CDNs: an address of the profile owner's choosing would tell them the IP and the time of everyone who looked
-const MEDIA_HOSTS = ["mzstatic.com", "itunes.apple.com", "scdn.co", "spotifycdn.com", "ytimg.com", "googleusercontent.com", "dzcdn.net", "sndcdn.com", "tidal.com", "bcbits.com"];
+const MEDIA_HOSTS = ["mzstatic.com", "itunes.apple.com", "scdn.co", "spotifycdn.com", "ytimg.com", "googleusercontent.com", "dzcdn.net", "sndcdn.com", "tidal.com", "bcbits.com", "coverartarchive.org", "cdn.bsky.app"];
 const media = (u) => (isMedia(u) ? u : "");
 const isMedia = (u) => { if (!isHttps(u)) return false; try { const h = new URL(u).hostname; return MEDIA_HOSTS.some(d => h === d || h.endsWith("." + d)); } catch { return false; } };
 const cut = (s, n) => (typeof s === "string" ? s.trim().slice(0, n) : "");
@@ -52,25 +52,31 @@ function clean(v) {
 }
 
 // The launch animation (js/splash.js) runs before anything is loaded: it reads the colour of the signed-in account from here
-function rememberColor(did, c) { try { c ? localStorage.setItem("skybee.pc." + did, c) : localStorage.removeItem("skybee.pc." + did); } catch {} }
-const flairAll = () => { try { return localStorage.getItem("skybee.flairAll") === "1"; } catch { return false; } };
+function rememberColor(did, c) { try { c ? localStorage.setItem("skybee.pc@" + did, c) : localStorage.removeItem("skybee.pc@" + did); } catch {} }
+// Privacy: opening someone's profile must never make their server see your IP address.
+// - the record of someone on the official servers is read from there; anyone else's goes through Slingshot, a public record cache (microcosm.blue),
+//   which fetches it from their server instead of you; accounts without a did:plc (their address is a website) are not read at all
+// - the toy picture comes from the official image CDN, which fetches it from their server by itself
+const SLINGSHOT = "https://slingshot.microcosm.blue";
 export function load(did) {
   if (!cache.has(did)) cache.set(did, (async () => {
-    const pds = did === api.session?.did ? api.session.pds : (await api.resolvePds(did)).pds;
+    const mine = did === api.session?.did;
+    if (!mine && !did.startsWith("did:plc:")) return null;
+    const pds = mine ? api.session.pds : (await api.resolvePds(did)).pds;
     if (!api.pdsOk(pds)) return null; // resolvePds already refuses such servers; the own session is checked here too
-    // someone else's own server would see the IP and the time of everyone opening their profile: only on request
-    if (did !== api.session?.did && !api.bskyHost(pds) && !flairAll()) return null;
-    const r = await fetch(`${pds}/xrpc/com.atproto.repo.getRecord?repo=${encodeURIComponent(did)}&collection=${NSID}&rkey=self`);
-    if (r.status === 400 || r.status === 404) { rememberColor(did, null); return null; } // no record: this person has no Skybee look
+    const via = mine || api.bskyHost(pds) ? pds : SLINGSHOT;
+    const r = await fetch(`${via}/xrpc/com.atproto.repo.getRecord?repo=${encodeURIComponent(did)}&collection=${NSID}&rkey=self`);
+    if (r.status === 400 || r.status === 404) { if (mine) rememberColor(did, null); return null; } // no record: this person has no Skybee look
     if (!r.ok) throw new Error("flair " + r.status); // a server hiccup: try again later (below), not «no look» for the whole session
     const rec = clean((await r.json()).value);
-    if (did === api.session?.did) rememberColor(did, rec?.color);
+    if (mine) rememberColor(did, rec?.color);
     return rec && { rec, pds };
   })().catch(() => { setTimeout(() => cache.delete(did), 60000); return null; })); // a network error is not remembered forever
   return cache.get(did);
 }
 
-const toyUrl = (pds, did, toy) => `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(toy.image.ref.$link)}`;
+const toyUrl = (pds, did, toy) => did === api.session?.did ? `${pds}/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(did)}&cid=${encodeURIComponent(toy.image.ref.$link)}`
+  : `https://cdn.bsky.app/img/feed_fullsize/plain/${encodeURIComponent(did)}/${encodeURIComponent(toy.image.ref.$link)}@png`;
 
 // One preview plays at a time and stops when the user leaves the page
 let audio = null;
@@ -213,12 +219,27 @@ export async function decorate(el, p) {
 // The iTunes catalogue needs no key, allows reading from any site (CORS) and gives a 30-second preview.
 // (There used to be a JSONP fallback: it ran a script from Apple inside Skybee, which a Content-Security-Policy forbids.)
 async function searchTracks(term) {
-  const url = `https://itunes.apple.com/search?media=music&entity=song&limit=15&term=${encodeURIComponent(term)}`;
-  let d;
-  try { const r = await fetch(url); if (!r.ok) throw 0; d = await r.json(); } catch { throw new Error("Немає з'єднання з каталогом музики"); }
-  return (d.results || []).filter(t => t.trackName && isHttps(t.trackViewUrl)).map(t => ({
-    url: t.trackViewUrl, title: cut(t.trackName, 120), artist: cut(t.artistName, 120),
-    cover: media((t.artworkUrl100 || "").replace("100x100", "300x300")), preview: media(t.previewUrl) }));
+  // Apple first (covers + 30-second previews); if it cannot be reached from here (CORS, a blocked host) → MusicBrainz, an open catalogue without a key
+  // (no preview, the cover comes from the Cover Art Archive)
+  try {
+    const r = await fetch(`https://itunes.apple.com/search?media=music&entity=song&limit=15&term=${encodeURIComponent(term)}`);
+    if (!r.ok) throw new Error("http " + r.status);
+    const d = await r.json();
+    return (d.results || []).filter(t => t.trackName && isHttps(t.trackViewUrl)).map(t => ({
+      url: t.trackViewUrl, title: cut(t.trackName, 120), artist: cut(t.artistName, 120),
+      cover: media((t.artworkUrl100 || "").replace("100x100", "300x300")), preview: media(t.previewUrl) }));
+  } catch { /* the second catalogue */ }
+  try {
+    const r = await fetch(`https://musicbrainz.org/ws/2/recording?fmt=json&limit=15&query=${encodeURIComponent(term)}`, { headers: { Accept: "application/json" } });
+    if (!r.ok) throw new Error("http " + r.status);
+    const d = await r.json();
+    return (d.recordings || []).filter(t => t.title && t.id).map(t => {
+      const rel = t.releases?.[0]?.id;
+      return { url: `https://musicbrainz.org/recording/${encodeURIComponent(t.id)}`, title: cut(t.title, 120),
+        artist: cut((t["artist-credit"] || []).map(a => a.name).join(", "), 120),
+        cover: rel && /^[0-9a-f-]{36}$/i.test(rel) ? media(`https://coverartarchive.org/release/${rel}/front-250`) : undefined };
+    });
+  } catch { throw new Error("Немає з'єднання з каталогом музики"); }
 }
 // A pasted streaming link → title, artist, cover. song.link knows most services; oEmbed is the fallback.
 async function lookupTrack(url) {

@@ -16,7 +16,20 @@ export const UI_LANGS = [
   ["fr", "Français", "eu", () => import("./i18n/fr.js")],
   ["es", "Español", "eu", () => import("./i18n/es.js")],
   ["it", "Italiano", "eu", () => import("./i18n/it.js")],
+  ["cs", "Čeština", "eu", () => import("./i18n/cs.js")],
+  ["sk", "Slovenčina", "eu", () => import("./i18n/sk.js")],
+  ["pt", "Português", "eu", () => import("./i18n/pt.js")],
+  ["nl", "Nederlands", "eu", () => import("./i18n/nl.js")],
+  ["ro", "Română", "eu", () => import("./i18n/ro.js")],
+  ["bg", "Български", "eu", () => import("./i18n/bg.js")],
+  ["crh", "Qırımtatarca", "eu", () => import("./i18n/crh.js")],
 ];
+// Language lists go A–Z by the Ukrainian name of the language (the labels themselves stay in each language's own words)
+const UK_NAME = { uk: "Українська", "uk-x-1928": "Українська (1928)", en: "Англійська", pl: "Польська", de: "Німецька", fr: "Французька", es: "Іспанська",
+  it: "Італійська", cs: "Чеська", sk: "Словацька", pt: "Португальська", nl: "Нідерландська", ro: "Румунська", bg: "Болгарська", crh: "Кримськотатарська",
+  be: "Білоруська", ru: "Російська", ja: "Японська" };
+export const sortAZ = (list) => [...list].sort((a, b) => (UK_NAME[a[0]] || a[1]).localeCompare(UK_NAME[b[0]] || b[1], "uk"));
+UI_LANGS.splice(0, UI_LANGS.length, ...sortAZ(UI_LANGS));
 // languages of the «eu» group fall back to English where their dictionary has no line yet (not to Ukrainian)
 const EN = () => import("./i18n/en.js");
 // Soviet spellings of 1933–1990, written to bring Ukrainian closer to Russian, are deliberately not offered.
@@ -28,6 +41,8 @@ const auto = () => { for (const l of navigator.languages || []) { const b = Stri
 export const uiLang = known(read()) ? read() : auto();
 export const setUiLang = (c) => { try { localStorage.setItem(KEY, c); } catch {} };
 // locale for dates and numbers (private-use tags like uk-x-1928 → uk)
+// the «Для новеньких» guide is about Ukrainian Bluesky: only for Ukrainian and its spellings/dialects
+export const isUk = UI_LANGS.find(l => l[0] === uiLang)?.[2] === "uk";
 export const locale = uiLang.split("-x-")[0];
 
 const CYR = /[А-ЯЁЇІЄҐа-яїієґ]/;

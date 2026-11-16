@@ -1,9 +1,10 @@
 // Skybee — post composer
 import { errText } from "./errors.js";
 import * as api from "./api.js";
+import { sortAZ } from "./i18n.js";
 import { esc, modal, toast, avatar, name, richText, spinner, at } from "./ui.js";
 
-const LANGS = [["uk", "Українська"], ["en", "English"], ["pl", "Polski"], ["be", "Беларуская"], ["ru", "Русский"], ["de", "Deutsch"], ["cs", "Čeština"], ["es", "Español"], ["ja", "日本語"]];
+const LANGS = sortAZ([["uk", "Українська"], ["en", "English"], ["pl", "Polski"], ["be", "Беларуская"], ["ru", "Русский"], ["de", "Deutsch"], ["cs", "Čeština"], ["es", "Español"], ["ja", "日本語"]]);
 export const getLang = () => { try { return localStorage.getItem("skybee.lang") || "uk"; } catch { return "uk"; } };
 
 /* ---------- who can reply (threadgate) ---------- */
@@ -302,6 +303,11 @@ export function openComposer(opts = {}, onDone) {
     if (c === "nocard") { card = null; cardFor = null; renderCard(); update(); }
     if (c === "gif" && !busy) {
       if (images.length || video) return toast("GIF не можна поєднати з фото чи відео");
+      if (!tenorKey()) { // no Tenor key: a GIF can still be taken from the device (the key makes the search work: Settings → Content and media)
+        toast("Пошук GIF потребує ключа Tenor (Налаштування → Вміст і медіа). Поки що вибери GIF-файл із пристрою", 5000);
+        m.querySelector('input[type=file]')?.click();
+        return;
+      }
       const g = await gifPicker();
       if (g) { card = g; cardFor = null; renderCard(); update(); }
     }

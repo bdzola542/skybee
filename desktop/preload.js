@@ -4,5 +4,6 @@ contextBridge.exposeInMainWorld("skybeeDesktop", {
   version: () => ipcRenderer.invoke("skybee:version"),
   update: () => ipcRenderer.invoke("skybee:update"), // check for a new version of the app now
   beta: (on) => ipcRenderer.invoke("skybee:beta", on), // beta channel: beta() → {on, available}; beta(true|false) switches it
+  icon: (png) => ipcRenderer.invoke("skybee:icon", png), // window and tray icon (PNG data URL from the colour picker)
   onLink: (cb) => ipcRenderer.on("skybee:link", (_e, url) => cb(String(url))), // skybee://… opened in the browser
 });

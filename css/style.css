@@ -733,7 +733,7 @@ nav.side .logo, .guestbar .logo { display: flex; align-items: center; gap: 10px;
 #splash.eclipse .sp-bee { filter: drop-shadow(0 0 8px rgba(255,40,40,.9)) drop-shadow(0 0 22px rgba(160,0,0,.6)); }
 .rhead { margin: 4px 6px 2px; }
 .msg.mine .rhead { text-align: right; }
-.rquote { max-width: min(320px, 75vw); padding: 6px 10px; margin-bottom: -10px; padding-bottom: 14px; border-radius: 14px 14px 4px 4px; background: var(--hover);
+.rquote { max-width: min(320px, 75vw); padding: 6px 10px; margin-bottom: 4px; border-radius: 14px; background: var(--hover);
   border: 1px solid var(--line); font-size: 13px; cursor: pointer; display: flex; flex-direction: column; opacity: .9; }
 .rquote span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .rquote.mine { background: color-mix(in srgb, var(--accent) 35%, var(--bg)); border-color: transparent; }
@@ -1785,6 +1785,80 @@ html.lg-refract:root[data-ui="glass"] :is(.topbar, nav.bottom, nav.side, .modal,
 body.detail main article.post.is-open { box-shadow: inset 3px 0 0 var(--accent); }
 article.post.kbd-on { box-shadow: inset 3px 0 0 var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 12px; }
 .kbd-help td { padding: 5px 10px 5px 0; vertical-align: top; } .kbd-help kbd { white-space: nowrap; }
+
+/* feed tabs hide while reading down, return on the first scroll up (app.js: feeds-hide) */
+#feedTabs { transition: transform .25s var(--ease-move, ease), opacity .2s; }
+html.feeds-hide #feedTabs { transform: translateY(-110%); opacity: 0; pointer-events: none; }
+html.feeds-hide .newpill { top: calc(12px + var(--sat)); }
+body.calm #feedTabs { transition: none; }
+
+/* «N people …» in notifications: the opened list of people */
+.nwhol[open] > summary { margin-bottom: 6px; }
+.nwhorow { display: flex; align-items: center; gap: 10px; padding: 6px 0; color: var(--text); }
+.nwhorow .who { display: flex; flex-direction: column; min-width: 0; }
+[data-nlist] { cursor: pointer; }
+
+/* a chat: the tab bar steps away, the message bar sits at the bottom edge (no overlap with a quoted reply either) */
+body:has(.chatbar) nav.bottom { display: none !important; }
+body:has(.chatbar) .chatbar { bottom: 0 !important; }
+:root[data-ui="glass"].glass-float body:has(.chatbar) .chatbar { bottom: calc(8px + var(--sab)) !important; }
+body:has(.chatbar) .chat { padding-bottom: calc(80px + var(--sab)); }
+
+/* platform icon sets (js: ICO_GL / ICO_MT in ui.js): iOS-like for Liquid Glass, Android-like for Material, the neutral line set for Skybee */
+.ico .i-gl, .ico .i-mt { display: none; }
+:root[data-ui="glass"] .ico:has(.i-gl) .i-sb, :root[data-ui="material"] .ico:has(.i-mt) .i-sb { display: none; }
+:root[data-ui="glass"] .ico .i-gl, :root[data-ui="material"] .ico .i-mt { display: inline; }
+:root[data-ui="glass"] .ico .i-gl { stroke-width: 1.55; stroke-linecap: round; stroke-linejoin: round; }
+:root[data-ui="material"] .ico .i-mt { stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* the chosen tab is filled, as in iOS and Android */
+:root[data-ui="glass"] :is(nav.bottom, nav.side) a.on .ico .i-gl { fill: currentColor; fill-opacity: .22; stroke-width: 1.9; }
+:root[data-ui="material"] :is(nav.bottom, nav.side) a.on .ico .i-mt { fill: currentColor; fill-opacity: .9; stroke-width: 1.4; }
+:root[data-ui="material"] :is(nav.bottom, nav.side) a.on .ico .i-mt :is(circle, path[d^="M10 20"]) { fill-opacity: .9; }
+
+/* «Вигляд стрічки» (Налаштування → Оформлення): компактний список і мозаїка */
+body.fl-compact .post { padding: 6px 12px; gap: 8px; }
+body.fl-compact .post .avatar { width: 32px !important; height: 32px !important; }
+body.fl-compact .post .imgs { max-height: 130px; overflow: hidden; }
+body.fl-compact .post .ext img, body.fl-compact .post .ext .thumb { display: none; }
+body.fl-compact .post .text { font-size: .94em; line-height: 1.35; }
+body.fl-mosaic .tiles { display: block; column-count: 3; column-gap: 3px; }
+body.fl-mosaic .tiles .tile { aspect-ratio: 1; break-inside: avoid; margin-bottom: 3px; }
+body.fl-mosaic .tiles .tile:nth-child(3n+1) { aspect-ratio: 3 / 4; }
+body.fl-mosaic .tiles .tile:nth-child(3n+2) { aspect-ratio: 1; }
+body.fl-mosaic .tiles .tile:nth-child(3n) { aspect-ratio: 4 / 5; }
+body.fl-mosaic .dbody .tiles { column-count: 2; }
+body.fl-mosaic .tiles .tile { display: block; }
+/* ---------- the feed tabs stay in sight: under the top bar while the feed scrolls (views.js sets --tbh) ---------- */
+#feedTabs { position: sticky; top: var(--tbh, 54px); z-index: 9; background: var(--bg); }
+:root[data-ui="material"].scrolled #feedTabs { background: var(--m-s2); }
+:root[data-ui="glass"] #feedTabs { background: color-mix(in srgb, var(--bg) 62%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6); }
+.chat { overflow-anchor: none; } /* views.js keeps the place itself when earlier messages come in */
+/* «↑ Нові пости» sits below the sticky feed tabs where they are shown */
+#feedTabs + .newpill { top: calc(var(--tbh, 54px) + var(--tabh, 0px) + 10px); }
+@media (pointer: coarse) { .nchips + * { touch-action: pan-y; } } /* sideways on the notifications list switches the filter (views.js) */
+html.feeds-hide #feedTabs + .newpill { top: calc(var(--tbh, 54px) + 10px); }
+/* ---------- phone sideways: the menu reaches the left edge of the phone;
+   its icons and labels stay clear of the notch / Dynamic Island (--sal) ---------- */
+@media (orientation: landscape) and (max-height: 500px) and (min-width: 641px) {
+  #app { padding-left: 0; grid-template-columns: calc(168px + var(--sal)) minmax(0, 1fr) 236px; }
+  body.deckmode #app { grid-template-columns: calc(168px + var(--sal)) minmax(0, 1fr); }
+  nav.side { padding-left: calc(8px + var(--sal)); }
+  :root[data-ui="glass"] nav.side { border-left: 0; border-radius: 0 28px 28px 0; }
+  :root[data-ui="material"] nav.side { border-radius: 0 16px 16px 0; }
+}
+@media (orientation: landscape) and (max-height: 500px) and (min-width: 641px) and (max-width: 780px) {
+  #app { grid-template-columns: calc(60px + var(--sal)) minmax(0, 1fr) 220px; }
+  body.deckmode #app { grid-template-columns: calc(60px + var(--sal)) minmax(0, 1fr); }
+}
+
+/* app icon picker: each tile shows the icon itself */
+.sb-icons { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0 4px; }
+.sb-ic { width: 56px; height: 56px; padding: 0; border: 2px solid var(--line); border-radius: 14px; background: none; overflow: hidden; display: grid; place-items: center; cursor: pointer; position: relative; }
+.sb-ic img { width: 100%; height: 100%; display: block; }
+.sb-ic.on { outline: 3px solid var(--accent); outline-offset: 3px; }
+.sb-ic.sb-any { background: var(--bg); color: var(--muted); font-size: 22px; }
+.sb-ic.sb-any input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
 
 /* ---------- audit fixes (16.11.2026, ui-inspector) ---------- */
 /* the ✏️ button never covers forms: settings, own feeds, a new starter pack (as in a chat) */

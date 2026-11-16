@@ -1,7 +1,7 @@
 {
   "name": "skybee-mobile",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Skybee для Android та iOS (Capacitor): та сама вебчастина в нативній оболонці",
   "scripts": {
     "web": "node ../scripts/dist.mjs mobile/www"
@@ -13,9 +13,11 @@
     "@capacitor/core": "7.6.10",
     "@capacitor/ios": "7.6.10",
     "@capacitor/status-bar": "7.0.6",
-    "capacitor-plugin-safe-area": "4.0.3"
+    "capacitor-plugin-safe-area": "4.0.3",
+    "skybee-icon": "file:plugins/skybee-icon"
   },
   "devDependencies": {
-    "@capacitor/assets": "3.0.5"
+    "@capacitor/assets": "3.0.5",
+    "sharp": "0.32.6"
   }
 }

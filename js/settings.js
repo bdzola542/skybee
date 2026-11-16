@@ -5,7 +5,8 @@ import { session } from "./api.js";
 import { bee, $, esc, name, vname, at, avatar, empty, spinner, toast, modal, confirmBox, pwa, actors, ico } from "./ui.js";
 import { header } from "./views.js";
 import { getLang } from "./compose.js";
-import { UI_LANGS, uiLang, setUiLang } from "./i18n.js";
+import * as push from "./push.js";
+import { UI_LANGS, uiLang, setUiLang, isUk, sortAZ } from "./i18n.js";
 import * as notify from "./notify.js";
 import { inkFor, colorsOf } from "./flair.js";
 
@@ -28,11 +29,23 @@ function visibleAccent(c, theme) {
 import * as flair from "./flair.js";
 import { statusBarFor, isNative } from "./native.js";
 import * as upd from "./updates.js";
+import { iconColor, setIconColor, beeSvg, svgUrl, ICON_COLORS } from "./appicon.js";
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
   set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
 };
+// The app colour belongs to the account (switching accounts switches the colour). An older device-wide value
+// goes to the account that is open the first time this runs.
+const ownDid = () => { try { return JSON.parse(localStorage.getItem("skybee.session"))?.did || ""; } catch { return ""; } };
+const colorKey = () => "skybee.color@" + ownDid();
+export function appColor() {
+  const v = store.get(colorKey());
+  if (v != null) return v;
+  const g = store.get("skybee.color");
+  if (g && ownDid()) { store.set(colorKey(), g); store.set("skybee.color", null); }
+  return g;
+}
 const saved = (promise, undo) => promise.then(() => toast("Збережено"), (ex) => { toast(errText(ex), 5000); undo?.(); });
 // the server refuses some account actions to an app password: say what to do instead of a bare error
 // an app password is refused here: the hint, plus the real cause in brackets (it may also be an expired session or a limit)
@@ -331,6 +344,7 @@ export async function notifications(el) {
         ? "Надходять, поки Skybee відкритий — у вкладці (навіть фоновій) або як встановлений застосунок."
         : "Цей браузер не підтримує системні сповіщення.", !notify.supported())}
     </div>
+    ${push.supported() ? `<div class="card" id="pushcard"><h3>Push при закритому застосунку</h3>${spinner()}</div>` : ""}
     <div class="card" id="nprefs"><h3>Що показувати в сповіщеннях</h3>${spinner()}</div>`;
   $("#sysnotify", el).onchange = async (e) => {
     if (!e.target.checked) { notify.disable(); return toast("Сповіщення вимкнено"); }
@@ -338,6 +352,7 @@ export async function notifications(el) {
     e.target.checked = false;
     toast("Браузер не дозволив сповіщення. Дозволь їх для цього сайту в налаштуваннях браузера.", 5000);
   };
+  if (push.supported()) pushCard($("#pushcard", el));
   const box = $("#nprefs", el);
   let prefs;
   try { prefs = await api.getNotifPrefs(); }
@@ -358,6 +373,39 @@ export async function notifications(el) {
   });
   box.querySelectorAll("[data-include]").forEach(s => s.onchange = () => put(s.dataset.include, { include: s.value, list: true, push: prefs[s.dataset.include]?.push ?? true }));
   $("[data-chat]", box).onchange = (e) => put("chat", { include: e.target.value, push: prefs.chat?.push ?? true });
+}
+
+// Web Push: the server on skybee.online checks the account once a minute with an app password and pushes news to this device
+async function pushCard(card) {
+  const draw = async () => {
+    const on = await push.active();
+    card.innerHTML = `<h3>Push при закритому застосунку</h3>` + (on
+      ? `<p class="small">✅ Увімкнено на цьому пристрої: сповіщення й нові повідомлення приходять, навіть коли Skybee закритий.</p><button class="ghost" id="pushoff">Вимкнути й видалити пароль із сервера</button>`
+      : `<p class="small muted">Сервер Skybee раз на хвилину питає Bluesky про нове й надсилає push. Для цього потрібен <b>окремий пароль застосунку</b>
+          (Bluesky → Налаштування → Паролі застосунків). Щоб приходили й чати — постав галочку <b>«Allow access to your direct messages»</b>.
+          Пароль зберігається на сервері зашифрованим, вимкнення його видаляє; у будь-який момент його можна відкликати в Bluesky.</p>
+        <label class="field">Пароль застосунку<input id="pushpw" type="password" autocomplete="off" spellcheck="false" placeholder="xxxx-xxxx-xxxx-xxxx"></label>
+        <button class="btn" id="pushon">Увімкнути push</button><p class="err small" id="pusherr"></p>`);
+    $("#pushoff", card)?.addEventListener("click", async () => { try { await push.disable(); toast("Push вимкнено"); } catch (ex) { toast("Сервер push недоступний — пароль ще на ньому. Спробуй вимкнути пізніше.", 5000); } draw(); });
+    $("#pushon", card)?.addEventListener("click", async (e) => {
+      const pw = $("#pushpw", card).value.trim(), err = $("#pusherr", card);
+      if (!pw) { err.textContent = "Встав пароль застосунку"; return; }
+      e.target.disabled = true; err.textContent = "";
+      try {
+        const { chat } = await push.enable(pw);
+        toast(chat ? "Push увімкнено, чати теж" : "Push увімкнено, але без чатів: у цьому паролі немає доступу до повідомлень", 5000);
+        draw();
+      } catch (ex) {
+        e.target.disabled = false;
+        err.textContent = ex.code === "mainpw" ? "Це основний пароль. Створи пароль застосунку: Bluesky → Налаштування → Паролі застосунків."
+          : ex.code === "login" ? "Bluesky не прийняв цей пароль. Потрібен саме пароль застосунку, не основний."
+          : ex.code === "denied" ? "Браузер не дозволив сповіщення. Дозволь їх для цього сайту в налаштуваннях браузера."
+          : ex.code === "rate" ? "Забагато спроб. Спробуй за годину."
+          : ex.code === "sw" || ex.code === "server" ? "Сервіс push зараз недоступний. Спробуй пізніше." : errText(ex);
+      }
+    });
+  };
+  draw();
 }
 
 /* ================= CONTENT & MEDIA ================= */
@@ -393,7 +441,7 @@ export async function media(el) {
       <label class="field">Ключ Tenor API — для пошуку GIF<input id="tenorkey" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(store.get("skybee.tenorKey") || "")}"></label>
       <p class="small muted">Безплатний: Google Cloud Console → новий проєкт → увімкнути «Tenor API» → «Облікові дані» → «Створити ключ API». Зберігається лише на цьому пристрої.</p>
       ${toggle("postcolors", "Кольори профілів на постах", store.get("skybee.postColors") !== "0", "Пости людей з оформленням Skybee — на м'якому градієнті їхнього профілю")}
-      ${toggle("flairall", "Оформлення з власних серверів", store.get("skybee.flairAll") === "1", "Статус, музика, колір та іграшка людей, чий акаунт не на серверах Bluesky. Їхній сервер бачитиме твою IP-адресу, коли ти відкриваєш їхній профіль")}
+      <p class="small muted">🔒 Оформлення Skybee безпечне для твоєї IP-адреси: чужі записи читаються через публічний кеш, а іграшка — з CDN, тож сервер власника профілю тебе не бачить.</p>
       ${toggle("players", "Вбудовані плеєри", store.get("skybee.players") !== "0", "YouTube, Spotify, SoundCloud, Vimeo, Twitch, Apple Music грають прямо в пості — після натискання ▶")}
       ${toggle("extmedia", "Показувати картки посилань із зображеннями", store.get("skybee.noLinkThumbs") !== "1")}
     </div>`;
@@ -408,7 +456,6 @@ export async function media(el) {
   $("#autogif", el).onchange = (e) => { store.set("skybee.autogif", e.target.checked ? "1" : null); toast("Збережено"); };
   $("#tenorkey", el).onchange = (e) => { store.set("skybee.tenorKey", e.target.value.trim() || null); toast(e.target.value.trim() ? "Ключ збережено — шукай GIF кнопкою «GIF» у редакторі" : "Ключ прибрано"); };
   $("#postcolors", el).onchange = (e) => { store.set("skybee.postColors", e.target.checked ? null : "0"); toast("Збережено — діє на нових екранах"); };
-  $("#flairall", el).onchange = (e) => { store.set("skybee.flairAll", e.target.checked ? "1" : null); toast("Збережено"); };
   $("#players", el).onchange = (e) => { store.set("skybee.players", e.target.checked ? null : "0"); toast("Збережено"); };
   $("#extmedia", el).onchange = (e) => { store.set("skybee.noLinkThumbs", e.target.checked ? null : "1"); document.body.classList.toggle("nolinkthumbs", !e.target.checked); toast("Збережено"); };
 }
@@ -433,7 +480,7 @@ export const refractWorks = () => /Chrome\/|Chromium|Electron/.test(navigator.us
 export function applyLook() {
   const t = store.get("skybee.theme") || "dark";
   const sys = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-  const root = document.documentElement, c = store.get("skybee.color");
+  const root = document.documentElement, c = appColor();
   root.dataset.theme = t === "system" ? sys : t;
   // app colour: the palette of the profile colour (js/flair.js); it replaces the gold accent (buttons, switches, the current tab)
   const ok = isHex(c);
@@ -453,6 +500,9 @@ export function applyLook() {
   root.classList.toggle("m-ripple", store.get("skybee.mRipple") !== "0");
   document.body.style.fontSize = (store.get("skybee.font") || "15") + "px";
   document.body.classList.toggle("calm", store.get("skybee.calm") === "1");
+  const fl = store.get("skybee.feedLook"); // «Вигляд стрічки»: компактний список / мозаїка медіа (css: fl-compact, fl-mosaic)
+  document.body.classList.toggle("fl-compact", fl === "compact");
+  document.body.classList.toggle("fl-mosaic", fl === "mosaic");
   document.body.classList.toggle("nolinkthumbs", store.get("skybee.noLinkThumbs") === "1");
   const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#0f1218";
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
@@ -461,13 +511,17 @@ export function applyLook() {
 }
 export async function appearance(el) {
   const draw = () => {
-    const theme = store.get("skybee.theme") || "dark", font = store.get("skybee.font") || "15", color = store.get("skybee.color") || "";
-    const uiPick = store.get("skybee.ui") || "auto", ui = uiStyle();
+    const theme = store.get("skybee.theme") || "dark", font = store.get("skybee.font") || "15", color = isHex(appColor()) ? appColor() : "";
+    const icolor = iconColor(), uiPick = store.get("skybee.ui") || "auto", ui = uiStyle();
     el.innerHTML = header("Оформлення", true) + `
       <div class="card"><h3>Тема</h3>${seg("th", [["system", "Як у системі"], ["dark", "Темна"], ["dim", "Сутінки"], ["light", "Світла"]], theme)}</div>
       <div class="card"><h3>Колір</h3><p class="muted small">Колір кнопок, перемикачів, позначок і активної вкладки — замість золотого.</p><div class="sb-swatches app">${
         [["", "Золотий — як у бджілки"], ...APP_COLORS].map(([c, n]) => `<button type="button" class="sb-sw${c ? "" : " none"}${c === color ? " on" : ""}" data-color="${c}" title="${n}" aria-label="${n}"${c ? ` style="background:${c}"` : ""}>${c ? "" : bee(18)}</button>`).join("")}<label class="sb-sw sb-any${color && !APP_COLORS.some(([c]) => c === color) ? " on" : ""}" title="Свій колір"${color && !APP_COLORS.some(([c]) => c === color) ? ` style="--own:${color}"` : ""}><input type="color" data-anycolor value="${isHex(color) ? color : "#ff4d4d"}"><b>+</b></label></div>
         <p class="muted small">${!color ? "Золотий — як у бджілки" : APP_COLORS.find(([c]) => c === color)?.[1] || `Свій колір ${color}`}</p></div>
+      <div class="card"><h3>Іконка застосунку</h3><p class="muted small">Кольори ті самі, що й для кнопок. На сайті — бджола без фону у вкладці; на комп'ютері — значок вікна й трею; на телефоні — значок на екрані з готових кольорів.</p>
+        <div class="sb-icons">${[["", "Золота — як є"], ...APP_COLORS.filter(([c]) => !isNative() || ICON_COLORS.includes(c))].map(([c, n]) => `<button type="button" class="sb-ic${c === icolor ? " on" : ""}" data-icon="${c}" title="${n}" aria-label="${n}"><img alt="" src="${svgUrl(beeSvg(c, true))}"></button>`).join("")}${isNative() ? "" : `<label class="sb-ic sb-any${icolor && !APP_COLORS.some(([c]) => c === icolor) ? " on" : ""}" title="Свій колір"><input type="color" data-anyicon value="${icolor || "#ff4d4d"}">${icolor && !APP_COLORS.some(([c]) => c === icolor) ? `<img alt="" src="${svgUrl(beeSvg(icolor, true))}">` : "<b>+</b>"}</label>`}</div></div>
+      <div class="card"><h3>Вигляд стрічки</h3><p class="muted small">«Компактний» — багато постів на екрані, дрібні відступи й картинки. «Мозаїка» — режим сітки ▦ показує фото різної висоти, як Pinterest.</p>
+        ${seg("fl", [["", "Звичайний"], ["compact", "Компактний"], ["mosaic", "Мозаїка"]], store.get("skybee.feedLook") || "")}</div>
       <div class="card"><h3>Розмір тексту</h3>${seg("font", [["14", "Менший"], ["15", "Звичайний"], ["17", "Більший"], ["19", "Великий"]], font)}</div>
       ${window.skybeeDesktop || window.Capacitor?.isNativePlatform?.() ? `<div class="card"><h3>Анімація запуску</h3>
         <p class="muted small">Бджола пролітає над лукою й сідає в логотип. Небо — за темою (уночі місяць і зорі) і кольором застосунку.</p>
@@ -489,11 +543,15 @@ export async function appearance(el) {
         ${toggle("mRipple", "Хвиля при натисканні", store.get("skybee.mRipple") !== "0", "Кругла «хвиля» від пальця на кнопках і пунктах")}
       </div>` : ""}`;
     el.querySelectorAll("[data-th]").forEach(b => b.onclick = () => { store.set("skybee.theme", b.dataset.th); applyLook(); draw(); });
-    el.querySelectorAll("[data-color]").forEach(b => b.onclick = () => { store.set("skybee.color", b.dataset.color || null); applyLook(); draw(); });
+    el.querySelectorAll("[data-color]").forEach(b => b.onclick = () => { store.set(colorKey(), b.dataset.color || ""); applyLook(); draw(); });
     const any = el.querySelector("[data-anycolor]");
-    any.oninput = () => { store.set("skybee.color", any.value.toLowerCase()); applyLook(); }; // live while the picker is open
-    any.onchange = () => { store.set("skybee.color", any.value.toLowerCase()); applyLook(); draw(); };
+    any.oninput = () => { store.set(colorKey(), any.value.toLowerCase()); applyLook(); }; // live while the picker is open
+    any.onchange = () => { store.set(colorKey(), any.value.toLowerCase()); applyLook(); draw(); };
+    el.querySelectorAll("[data-icon]").forEach(b => b.onclick = () => { setIconColor(b.dataset.icon); draw(); });
+    const anyI = el.querySelector("[data-anyicon]");
+    if (anyI) anyI.onchange = () => { setIconColor(anyI.value); draw(); };
     el.querySelectorAll("[data-font]").forEach(b => b.onclick = () => { store.set("skybee.font", b.dataset.font); applyLook(); draw(); });
+    el.querySelectorAll("[data-fl]").forEach(b => b.onclick = () => { store.set("skybee.feedLook", b.dataset.fl || null); applyLook(); draw(); });
     el.querySelectorAll("[data-intro]").forEach(b => b.onclick = () => { store.set("skybee.intro", b.dataset.intro === "full" ? null : b.dataset.intro); draw(); });
     el.querySelectorAll("[data-ui]").forEach(b => b.onclick = () => { store.set("skybee.ui", b.dataset.ui === "auto" ? null : b.dataset.ui); applyLook(); draw(); });
     el.querySelectorAll("[data-glass]").forEach(b => b.onclick = () => { store.set("skybee.glass", b.dataset.glass === "normal" ? null : b.dataset.glass); applyLook(); draw(); });
@@ -537,8 +595,8 @@ export async function a11y(el) {
 }
 
 /* ================= LANGUAGES ================= */
-export const LANGS = [["uk", "Українська"], ["en", "English"], ["pl", "Polski"], ["be", "Беларуская"], ["ru", "Русский"], ["de", "Deutsch"],
-  ["fr", "Français"], ["es", "Español"], ["it", "Italiano"], ["pt", "Português"], ["cs", "Čeština"], ["ja", "日本語"]];
+export const LANGS = sortAZ([["uk", "Українська"], ["en", "English"], ["pl", "Polski"], ["be", "Беларуская"], ["ru", "Русский"], ["de", "Deutsch"],
+  ["fr", "Français"], ["es", "Español"], ["it", "Italiano"], ["pt", "Português"], ["cs", "Čeština"], ["ja", "日本語"]]);
 export const translateLang = () => store.get("skybee.tlang") || "uk";
 export async function langs(el) {
   const content = api.contentLangs();
@@ -565,7 +623,7 @@ export async function langs(el) {
 /* ================= HELP ================= */
 export async function help(el) {
   el.innerHTML = header("Довідка", true) + `
-    <div class="sgroup">${row("#/newcomers", "help", "🌱 Для новеньких: як усе працює, українські стрічки й списки 🇺🇦")}</div>
+    ${isUk ? `<div class="sgroup">${row("#/newcomers", "help", "🌱 Для новеньких: як усе працює, українські стрічки й списки 🇺🇦")}</div>` : ""}
     <div class="card"><h3>Клавіатура</h3>
       <p><kbd>N</kbd> — новий пост<br><kbd>/</kbd> — пошук<br><kbd>Ctrl</kbd> + <kbd>Enter</kbd> — опублікувати з редактора<br><kbd>Esc</kbd> — закрити вікно</p></div>
     <div class="card"><h3>Пароль застосунку чи основний?</h3>
@@ -588,7 +646,7 @@ const INSTALL = [
   { id: "android", icon: "🤖", name: "Android", note: "Файл APK — дозволь встановлення з браузера", re: /\.apk$/i },
   { id: "ios", icon: "🍎", name: "iPhone / iPad", note: "IPA без підпису — встанови через Sideloadly чи AltStore", re: /\.ipa$/i },
   { id: "appimage", icon: "🐧", name: "Linux — AppImage", note: "Один файл, оновлюється сам", re: /\.AppImage$/i },
-  { id: "flatpak", icon: "📦", name: "Linux — Flatpak", note: "flatpak install --user Skybee.flatpak", re: /\.flatpak$/i },
+  { id: "flatpak", icon: "📦", name: "Linux — Flatpak", note: "flatpak remote-add --user skybee https://skybee.online/flatpak/skybee.flatpakrepo && flatpak install --user skybee io.github.vysocavnu.skybee", re: /\.flatpak$/i },
   { id: "tar", icon: "🗜️", name: "Linux — tar.gz", note: "Архів, розпакуй і запусти skybee", re: /linux-x64\.tar\.gz$/i },
 ];
 let latestAssets = null; // cached for the session: [{name, browser_download_url}]
@@ -673,7 +731,7 @@ export async function about(el) {
         available: `Вийшла нова ${r.beta ? "бета-версія" : "версія"}: ${r.version}. ${cap()?.getPlatform?.() === "ios" ? "Встанови IPA через Sideloadly чи AltStore." : "Встанови її поверх — акаунти й налаштування залишаться."}`,
         downloading: `Знайдено версію ${r.version}. Вона завантажується у фоні (прогрес — на значку в панелі задач); коли буде готова, Skybee запропонує перезапуститися.`,
         ready: `Версія ${r.version} вже завантажена — перезапусти Skybee, щоб її встановити.`,
-        flatpak: "Цю версію оновлює Flathub: відкрий «Програми» (GNOME Software чи Discover) або виконай flatpak update.",
+        flatpak: "Цю версію оновлює Flatpak (якщо встановлена через репозиторій skybee): відкрий «Програми» (GNOME Software чи Discover) або виконай flatpak update.",
         manual: "Ця збірка не оновлюється сама — завантаж нову версію зі сторінки релізів Skybee на GitHub.",
         dev: "Skybee запущено з вихідного коду — оновлення вимкнені.",
         error: `Не вдалося перевірити оновлення. Перевір підключення до інтернету й спробуй ще раз пізніше. (${r.code || "network"})`,
@@ -691,7 +749,8 @@ export async function about(el) {
   };
   $("#resetlocal", el).onclick = async () => {
     if (!await confirmBox("Скинути налаштування цього пристрою?", "Скинути", true)) return;
-    for (const k of ["theme", "color", "ui", "glass", "glassFloat", "lgTilt", "lgRefract", "intro", "mTonal", "mLabels", "mRipple", "font", "lang", "tlang", "contentLangs", "requireAlt", "calm", "autogif", "players", "flairAll", "postColors", "tenorKey", "noLinkThumbs", "draft"]) store.set("skybee." + k, null);
+    for (const k of ["theme", "color", "ui", "glass", "glassFloat", "lgTilt", "lgRefract", "intro", "mTonal", "mLabels", "mRipple", "font", "lang", "tlang", "contentLangs", "requireAlt", "calm", "autogif", "players", "flairAll", "feedLook", "postColors", "tenorKey", "noLinkThumbs", "draft"]) store.set("skybee." + k, null);
+    store.set(colorKey(), null);
     location.reload();
   };
 }
