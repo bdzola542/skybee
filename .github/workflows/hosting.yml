@@ -11,7 +11,7 @@ name: Hosting (NIC.UA)
 on:
   push:
     branches: ["main"]
-    paths: ["index.html", "404.html", "offline.html", "favicon.ico", "manifest.webmanifest", "sw.js",
+    paths: ["index.html", "404.html", "offline.html", "favicon.ico", "manifest.webmanifest", "sw.js", "robots.txt", "sitemap.xml",
             "css/**", "js/**", "icons/**", "errors/**", "data/**", "hosting/**", ".github/workflows/hosting.yml"]
   workflow_run:
     workflows: ["Stars about war"] # його коміт від GITHUB_TOKEN сам інших workflow не запускає
@@ -46,7 +46,7 @@ jobs:
         if: steps.cfg.outputs.ok == '1'
         run: |
           mkdir site
-          cp -r index.html 404.html offline.html favicon.ico manifest.webmanifest sw.js css js icons errors data site/
+          cp -r index.html 404.html offline.html favicon.ico manifest.webmanifest sw.js robots.txt sitemap.xml css js icons errors data site/
           cp hosting/.htaccess site/
           echo "{\"time\": $(date +%s)000}" > site/build.json
       - name: Залити на хостинг
@@ -71,7 +71,7 @@ jobs:
           # index.html і sw.js — останніми, щоб відвідувач не отримав нову оболонку зі старими js
           lftp -c "
             set net:max-retries 3; set net:timeout 30;
-            set ftp:ssl-force true; set ftp:ssl-protect-data true;
+            set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate yes;
             open --env-password -u \"$LOGIN\" $PROTO://$HOST;
             mirror -R --verbose --parallel=4 -X index.html -X sw.js site/ \"${DIR:-.}\";
             cd \"${DIR:-.}\";

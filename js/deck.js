@@ -1,5 +1,6 @@
 // Skybee — deck (several columns side by side) and the own-feed builder («Мої стрічки»)
 import { errText } from "./errors.js";
+import { t as T } from "./i18n.js";
 import * as api from "./api.js";
 import * as src from "./sources.js";
 import { $, esc, enc, toast, modal, confirmBox, menu, empty, at } from "./ui.js";
@@ -18,11 +19,11 @@ async function savedChoices() {
       out.feeds = d.feeds.map(g => ({ uri: g.uri, label: g.displayName }));
     }
     const seen = new Set();
-    for (const l of await api.getMyLists().catch(() => [])) { seen.add(l.uri); out.lists.push({ uri: l.uri, label: l.name }); }
+    for (const l of await api.getMyLists().catch(e => { out.listsError = e; return []; })) { seen.add(l.uri); out.lists.push({ uri: l.uri, label: l.name }); }
     for (const i of items.filter(i => i.type === "list" && !seen.has(i.value))) {
       try { const l = (await api.get("app.bsky.graph.getList", { list: i.value, limit: 1 })).list; out.lists.push({ uri: l.uri, label: l.name }); } catch {}
     }
-  } catch {}
+  } catch (e) { out.error = e; }
   return out;
 }
 
@@ -56,7 +57,10 @@ export function pickSource({ deck = false, title = "Додати джерело"
         choices ||= await savedChoices();
         if (sel.value !== t) return;
         const arr = t === "feed" ? choices.feeds : choices.lists;
-        extra.innerHTML = `${arr.length ? `<label class="field">${t === "feed" ? "Збережений фід" : "Список"}<select data-f="pick">${opts(arr.map(x => [x.uri, x.label]))}</select></label>` : ""}
+        // the saved feeds or lists did not load: say so (it used to look as if there were none)
+        const why = choices.error || (t === "list" && choices.listsError); // a list failure is not shown on the feed tab
+        const failed = why ? `<p class="err">${esc(T("Не вдалося завантажити збережені — можна вставити посилання ({0})", errText(why)))}</p>` : "";
+        extra.innerHTML = `${failed}${arr.length ? `<label class="field">${t === "feed" ? "Збережений фід" : "Список"}<select data-f="pick">${opts(arr.map(x => [x.uri, x.label]))}</select></label>` : ""}
           <label class="field">${arr.length ? "Або посилання" : "Посилання"} на ${t === "feed" ? "фід" : "список"} з bsky.app<input data-f="q" placeholder="https://bsky.app/profile/…/${t === "feed" ? "feed" : "lists"}/…"></label>`;
       }
       if (t === "myfeed") {

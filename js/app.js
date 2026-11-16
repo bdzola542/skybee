@@ -1,5 +1,5 @@
 // Skybee — app shell, router, global actions
-import { ready } from "./i18n.js"; // the interface language: its dictionary loads before the first screen
+import { ready, t as T } from "./i18n.js"; // the interface language: its dictionary loads before the first screen
 import { errText } from "./errors.js";
 import "./splash.js"; // the welcome scene, first of all
 import { isNative, onLink } from "./native.js"; // Android/iOS app: links to the browser, the Back button, skybee:// links
@@ -12,7 +12,7 @@ import * as flair from "./flair.js";
 import * as D from "./deck.js";
 import * as N from "./newbie.js";
 import * as U from "./updates.js";
-import { bee, isLive, $, esc, calmMotion, posts, actors, pwa, toast, menu, confirmBox, modal, lightbox, attachVideo, webUrl, avatar, name, actionsBar, gateLine, hiddenReplies, at, num, ico } from "./ui.js";
+import { bee, isLive, $, esc, calmMotion, posts, actors, pwa, toast, menu, closeMenu, confirmBox, modal, lightbox, attachVideo, webUrl, avatar, name, actionsBar, gateLine, hiddenReplies, at, num, ico } from "./ui.js";
 import { openComposer, openGateEditor } from "./compose.js";
 
 try { S.applyLook(); } catch {}
@@ -212,7 +212,8 @@ function signupScreen() {
     try {
       const full = handle + f.domain.value;
       await api.signup(pds, { email: f.email.value.trim(), handle: full, password: f.pass.value, inviteCode: f.invite.value.trim() });
-      await api.updatePref("personalDetailsPref", { birthDate: new Date(birth).toISOString() }).catch(() => {});
+      // the account exists already: a failed birth date is only told, it can be set later in Settings → Account
+      await api.updatePref("personalDetailsPref", { birthDate: new Date(birth).toISOString() }).catch(e => toast(T("Дату народження не збережено — її можна вказати пізніше в налаштуваннях ({0})", errText(e)), 6000));
       if (!fromApp) { toast("Акаунт створено 🐝 Підтвердь email з листа, коли зможеш"); restart(); return; }
       // back to the app: it asks for the password once more (a session is not passed through a link)
       f.innerHTML = `<h3>Акаунт створено 🐝</h3><p class="small">Повертаємо тебе в Skybee… Якщо нічого не сталося, натисни кнопку. Не забудь підтвердити email з листа.</p>
@@ -307,21 +308,27 @@ function shell() {
 }
 
 /* ---------- badges ---------- */
+let badgesBusy = false;
 async function badges() {
-  if (!api.session) return;
-  let count = 0, convos = null;
+  // a slow round never overlaps the next one. A hidden tab still counts (system notifications are for exactly that time)
+  if (!api.session || badgesBusy) return;
+  badgesBusy = true;
+  let count = null, convos = null;
   try {
     ({ count } = await api.get("app.bsky.notification.getUnreadCount"));
     for (const id of ["nbadge", "mnbadge"]) { const d = document.getElementById(id); if (d) { d.textContent = count > 30 ? "30+" : count || ""; d.hidden = !count; } }
-  } catch {}
+  } catch (e) { console.warn("Skybee: unread count", e?.code || e?.status || e); } // background: the next round retries; the counters keep their last value
   try {
     ({ convos } = await api.chat("chat.bsky.convo.listConvos", { limit: 50 }));
     const c = convos.reduce((s, x) => s + (x.muted ? 0 : x.unreadCount), 0);
     for (const id of ["cbadge", "mcbadge"]) { const e = document.getElementById(id); if (e) { e.textContent = c || ""; e.hidden = !c; } }
-  } catch {}
-  notify.check(count, convos).catch(() => {});
+  } catch (e) { console.warn("Skybee: chats", e?.code || e?.status || e); }
+  badgesBusy = false;
+  // a failed count is not «0 unread»: that would make the next real count look like new notifications
+  if (count != null) notify.check(count, convos).catch(e => console.warn("Skybee: notifications", e));
 }
 window.addEventListener("skybee:badge", badges);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) badges(); });
 
 /* ---------- router ---------- */
 /* ---------- screen transitions ----------
@@ -387,18 +394,25 @@ async function detailRoute() {
   return false;
 }
 
+let routeSeq = 0; // each navigation gets a number; a screen that resolves after a newer one started is stale
 async function route() {
+  const my = ++routeSeq;
   await api.prefsReady; // muted words must be known before the first post is drawn
+  if (my !== routeSeq) return;
   if (location.hash.startsWith("#/signup") && (!api.session || hashQuery().get("app") === "1")) return signupScreen();
   if (!api.session && !guestRoute()) return loginScreen();
   if (!api.session && !$("#main")) guestShell();
   if (api.session && await detailRoute()) return;
+  if (my !== routeSeq) return;
   cleanup?.(); cleanup = null;
   document.body.classList.remove("drawer");
-  document.querySelector(".popmenu")?.remove();
-  document.querySelectorAll(".modal-bg").forEach(m => m.close ? m.close() : m.remove());
-  const main = $("#main");
-  if (!main) return; // signed in a moment ago, the page is about to reload
+  closeMenu();
+  document.querySelectorAll(".modal-bg, .msheet-bg").forEach(m => m.close ? m.close() : m.remove());
+  const old = $("#main");
+  if (!old) return; // signed in a moment ago, the page is about to reload
+  // every screen gets a fresh <main>: one still loading after the user went on writes into the old, detached one
+  // (and listeners a screen put on <main> leave with it)
+  const main = document.createElement("main"); main.id = "main"; old.replaceWith(main);
   let [path, qs] = location.hash.slice(1).split("?");
   path = path || "/";
   const q = Object.fromEntries(new URLSearchParams(qs || ""));
@@ -413,7 +427,9 @@ async function route() {
     const h = a.dataset.nav.slice(1);
     // «/profile/me» is the own profile; only that link (a plain replace of "/me" also hit «/messages» → no active «Чати» tab)
     const want = h === "/profile/me" ? "/profile/" + api.session?.handle : h;
-    a.classList.toggle("on", h === "/" ? path === "/" : path === want || path.startsWith(want + "/"));
+    const on = h === "/" ? path === "/" : path === want || path.startsWith(want + "/");
+    a.classList.toggle("on", on);
+    on ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"); // the current section is said, not only shown
   });
   document.documentElement.classList.remove("tab-min", "fab-min", "scrolled"); // a new screen starts with the full bars
   placeLens($("nav.bottom a.on"));
@@ -451,11 +467,16 @@ async function route() {
     else if (seg[0] === "profile" && ["followers", "follows", "known"].includes(seg[2])) r = V.follows(main, { actor: seg[1], kind: seg[2] });
     else if (seg[0] === "profile") r = V.profile(main, { actor: seg[1], tab: seg[2] });
     else main.innerHTML = `<p class="pad">Сторінку не знайдено. <a href="#/">На головну</a></p>`;
-    cleanup = await r;
+    const done = await r;
+    // the user went on while this screen loaded: stop its timers instead of keeping them as the current cleanup
+    if (my !== routeSeq) { if (typeof done === "function") done(); return; }
+    cleanup = done;
     if (!main._tint) flair.untint(main);
     if (keepScroll) restoreScroll(keepScroll);
   } catch (e) {
+    if (my !== routeSeq) return; // a newer screen is already there
     if (!main._tint) flair.untint(main);
+    main.querySelectorAll(".sentinel").forEach(x => x.remove()); // no spinner left turning above the error
     main.insertAdjacentHTML("beforeend", `<div class="card"><p class="err">${esc(errText(e))}</p><button class="ghost" data-act="back">← Назад</button></div>`);
   }
 }
@@ -541,7 +562,10 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
 // - Material: the top app bar takes its «scrolled» colour, and the extended ✏️ «Новий пост» button shrinks to its icon (as in Gmail)
 {
   let lastY = scrollY, acc = 0;
-  addEventListener("scroll", () => {
+  // once a frame at most (scroll events can come several times per frame)
+  let frame = 0;
+  addEventListener("scroll", () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; onScroll(); }); }, { passive: true });
+  function onScroll() {
     const r = document.documentElement, y = scrollY, d = y - lastY; lastY = y;
     acc = Math.sign(d) === Math.sign(acc) ? acc + d : d;
     r.classList.toggle("scrolled", y > 4);
@@ -557,7 +581,7 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
     else if (min && (acc < -24 || y < 60)) r.classList.remove("tab-min");
     else return;
     setTimeout(() => placeLens($("nav.bottom a.on")), 380); // also on transitionend / resize of the tabs
-  }, { passive: true });
+  }
 }
 {
   let drag = null;
@@ -632,7 +656,15 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
   let queued = false;
   const all = () => { queued = false; document.querySelectorAll(ROW).forEach(r => place(r)); };
   const soon = () => { if (!queued) { queued = true; requestAnimationFrame(all); } };
-  new MutationObserver(soon).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
+  // only changes in or around a row matter (a like's «.pop», a new post, the scroll classes used to re-measure every row)
+  const touches = (list) => list.some(m => {
+    const t = m.target;
+    if (t.nodeType === 1 && t.closest?.(ROW)) return true;
+    return m.type === "childList" && [...m.addedNodes].some(n => n.nodeType === 1 && (n.matches(ROW) || n.querySelector?.(ROW)));
+  });
+  new MutationObserver((list) => { if (touches(list)) soon(); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
+  new MutationObserver(soon).observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-ui"] }); // html: tab-min, font size, style
+  new MutationObserver(soon).observe(document.body, { attributes: true, attributeFilter: ["class"] }); // body: the side pane (tablets), the drawer
   addEventListener("change", soon); addEventListener("resize", soon); document.fonts?.ready.then(soon).catch(() => {});
 
   let drag = null;
@@ -1138,7 +1170,9 @@ const gifSeen = new IntersectionObserver((list) => {
     else if (v.dataset.ready) v.pause();
   }
 }, { threshold: 0.5 });
-new MutationObserver(() => {
+new MutationObserver((list) => {
+  // most changes bring no video: look at the setting and the page only when one arrives
+  if (!list.some(m => [...m.addedNodes].some(n => n.nodeType === 1 && (n.tagName === "VIDEO" || n.querySelector?.("video[data-gif]"))))) return;
   let on = false; try { on = localStorage.getItem("skybee.autogif") === "1"; } catch {}
   if (!on) return;
   document.querySelectorAll("video[data-gif]:not([data-watched])").forEach(v => { v.dataset.watched = "1"; gifSeen.observe(v); });
@@ -1146,9 +1180,9 @@ new MutationObserver(() => {
 
 /* ---------- keyboard shortcuts (a computer, an iPad with a keyboard) ----------
    n — new post, / — search, j / k — next / previous post, Enter or o — open it, l — like, r — reply,
-   Esc or Backspace — back, 1…5 — the tabs of the menu, ? — this list */
+   Esc — back, 1…5 — the tabs of the menu, ? — this list */
 const KEYS_HELP = [["n", "новий пост"], ["/", "пошук"], ["j / k", "наступний / попередній пост"], ["Enter, o", "відкрити пост"], ["l", "вподобати"],
-  ["r", "відповісти"], ["Esc, Backspace", "назад"], ["1 – 5", "головна, пошук, сповіщення, чати, профіль"], ["?", "ці підказки"]];
+  ["r", "відповісти"], ["Esc", "назад"], ["1 – 5", "головна, пошук, сповіщення, чати, профіль"], ["?", "ці підказки"]];
 function kbdPost(step) {
   const all = [...document.querySelectorAll("#main article.post, #detail article.post")].filter(a => a.offsetParent);
   if (!all.length) return null;
@@ -1162,17 +1196,24 @@ function kbdPost(step) {
 }
 document.addEventListener("keydown", (e) => {
   if (e.target.closest("input, textarea, select, [contenteditable]") || e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key;
+  // a focused card (post, person, feed, quote) or a non-button control opens with Enter / Space, as a link or button would
+  if (((k === "Enter" && e.target.matches?.("[data-href], [role=button][data-act]")) || (k === " " && e.target.matches?.("[role=button][data-act]"))) && !e.target.matches("a, button")) {
+    e.preventDefault(); e.target.click(); return;
+  }
   const open = document.querySelector(".modal-bg:not(.leaving), .msheet-bg:not(.leaving), .popmenu:not(.leaving)");
   if (open || !api.session) return;
+  // single-key shortcuts can be switched off (Settings → Accessibility): voice control and on-screen keyboards trip over them
+  let keysOff = false; try { keysOff = localStorage.getItem("skybee.hotkeys") === "0"; } catch {}
+  if (keysOff) return;
   const cur = document.querySelector("article.post.kbd-on");
-  const k = e.key;
   if (k === "n") { e.preventDefault(); openComposer({}, reloadView); }
   else if (k === "/") { e.preventDefault(); location.hash = "#/search"; }
   else if (k === "j" || k === "k") { e.preventDefault(); kbdPost(k === "j" ? 1 : -1); }
-  else if ((k === "Enter" || k === "o") && cur?.dataset.href) { e.preventDefault(); location.hash = cur.dataset.href; }
+  else if ((k === "Enter" || k === "o") && cur?.dataset.href && !e.target.closest("a, button, [role=button], summary")) { e.preventDefault(); location.hash = cur.dataset.href; }
   else if (k === "l" && cur) { e.preventDefault(); cur.querySelector('[data-act="like"]')?.click(); }
   else if (k === "r" && cur) { e.preventDefault(); cur.querySelector('[data-act="reply"]')?.click(); }
-  else if ((k === "Escape" || k === "Backspace") && location.hash && location.hash !== "#/") { e.preventDefault(); history.back(); }
+  else if (k === "Escape" && location.hash && location.hash !== "#/") { e.preventDefault(); history.back(); } // not Backspace: one stray key left a page unnoticed
   else if (/^[1-5]$/.test(k)) { e.preventDefault(); location.hash = ["#/", "#/search", "#/notifications", "#/messages", "#/profile/me"][+k - 1]; }
   else if (k === "?") { e.preventDefault(); modal(`<h3>Клавіші</h3><table class="kbd-help">${KEYS_HELP.map(([a, b]) => `<tr><td><kbd>${esc(a)}</kbd></td><td>${esc(b)}</td></tr>`).join("")}</table>`); }
 });
@@ -1189,7 +1230,7 @@ window.addEventListener("storage", (e) => {
 
 /* ---------- PWA ---------- */
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) { // the desktop app ships its own files, no service worker there
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  navigator.serviceWorker.register("sw.js").catch(e => console.warn("Skybee: service worker (offline mode and notification clicks are off)", e));
   // a click on a system notification: sw.js asks the open tab to show the right screen
   navigator.serviceWorker.addEventListener("message", (e) => { if (e.data?.type === "skybee:open") location.hash = e.data.hash; });
 }

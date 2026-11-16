@@ -86,7 +86,8 @@ function lookup(s) {
     if (!m) continue;
     const parts = []; order.forEach((n, i) => { parts[n] = m[i + 1]; });
     // the changing parts may hold words of their own («3 ваші пости»)
-    r = v.replace(/\{(\d+)\}/g, (_, n) => { const p = parts[n] ?? ""; return /[А-ЯЇІЄҐа-яїієґ]/.test(p) ? (lookup(p.trim()) ?? p) : p; });
+    // the spaces around a translated part stay («…tab{0}» + « й увійди» → «…tab and sign in», not «taband»)
+    r = v.replace(/\{(\d+)\}/g, (_, n) => { const p = parts[n] ?? ""; if (!/[А-ЯЇІЄҐа-яїієґ]/.test(p)) return p; const x = lookup(p.trim()); return x == null ? p : p.match(/^\s*/)[0] + x + p.match(/\s*$/)[0]; });
     break;
   }
   // «Поширити · 3 хв» — pieces joined with a dot are tried one by one
@@ -134,7 +135,9 @@ function node(n) {
   attrs(n);
   if (n.closest(SKIP)) return;
   n.querySelectorAll?.("[title], [placeholder], [aria-label], optgroup[label]").forEach(attrs);
-  const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT);
+  // people's words (post texts, bios, chats) are not walked into at all: a long feed has thousands of their text nodes
+  const w = document.createTreeWalker(n, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+    { acceptNode: (x) => x.nodeType === 1 ? (x.matches(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_SKIP) : NodeFilter.FILTER_ACCEPT });
   let x; while ((x = w.nextNode())) node(x);
 }
 function attrs(el) {

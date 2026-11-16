@@ -1,0 +1,12 @@
+# Dependabot: proposes updates (as pull requests) for the pinned GitHub Actions and the npm packages of the apps.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule: { interval: weekly }
+  - package-ecosystem: npm
+    directory: /mobile
+    schedule: { interval: weekly }

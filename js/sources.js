@@ -76,7 +76,7 @@ export async function myFeeds(fresh = false) {
   const net = api.get("com.atproto.repo.getRecord", { repo: api.session.did, collection: NSID, rkey: "self" })
     .then(d => (Array.isArray(d.value?.feeds) ? d.value.feeds : []), (e) => (e.status === 400 || e.code === "RecordNotFound" ? [] : null))
     .then(list => { if (list) { mine = list; try { localStorage.setItem(LOCAL(), JSON.stringify(list)); } catch {} } return mine || []; });
-  return mine && !fresh ? (net.catch(() => {}), mine) : net;
+  return mine && !fresh ? (net.catch(e => console.warn("Skybee: my feeds did not sync, the copy on this device is shown", e?.code || e)), mine) : net;
 }
 export async function saveMyFeeds(list) {
   mine = list;

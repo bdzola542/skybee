@@ -382,8 +382,6 @@ main { overflow-x: clip; }
 .srow.danger { color: var(--danger); }
 .sicon { flex: none; display: grid; place-items: center; width: 26px; color: var(--muted); }
 .schev { color: var(--muted); } .schev svg { width: 18px; height: 18px; display: block; }
-.savas { display: flex; } .savas .avatar + .avatar { margin-left: -8px; }
-.savas .avatar { border: 2px solid var(--bg); }
 .stoggle { display: flex; align-items: center; gap: 12px; padding: 8px 0; cursor: pointer; }
 .stoggle small { display: block; margin-top: 2px; font-size: 13px; }
 .stoggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
@@ -421,7 +419,7 @@ main.sb-tint, .sideprof.sb-tint { --bg: color-mix(in srgb, var(--sb) 56%, #000);
   --bg2: var(--sb2, var(--sb)); --panel2: color-mix(in srgb, var(--sb2, var(--sb)) 90%, #000);
   --bg3: var(--sb3, var(--sb)); --panel3: color-mix(in srgb, var(--sb3, var(--sb)) 90%, #000);
   --line: color-mix(in srgb, var(--sb) 72%, #000); --text: var(--sb-ink); --muted: color-mix(in srgb, var(--sb-ink) 78%, var(--sb)); --link: var(--sb-ink);
-  --accent: var(--sb-ink); --accent-ink: var(--sb); }
+  --accent: var(--sb-ink); --accent-ink: var(--sb-btn, var(--sb)); }
 main.sb-tint .post a:not(.ghost):not(.btn), main.sb-tint .bio a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
 /* the colour fades out of the column into the side menus: one wide layer behind it, solid over the column and easing out on both sides */
 main.sb-tint { color: var(--text); border-color: transparent; position: relative; overflow: clip; overflow-clip-margin: 200px; }
@@ -598,7 +596,7 @@ body.guest .topbar { top: 49px; }
 .chatbar .replybar { flex: 0 0 100%; border: 0; border-left: 3px solid var(--accent); border-radius: 8px; padding: 4px 4px 4px 10px; }
 .chatbar textarea { flex: 1; width: auto; }
 .memoji[hidden] { display: none; }
-body:has(.chatbar) .fab { display: none; } /* in a chat the ✏️ button would cover the send button */
+body:has(.chatbar) .fab { display: none !important; } /* in a chat (!important: the Material FAB rule shows it again) the ✏️ button would cover the send button */
 .mquote { max-width: min(280px, 70vw); }
 
 /* own profile card in the right column takes the same Skybee colour */
@@ -1574,6 +1572,9 @@ body.calm .plist > * { animation: none !important; }
 /* Material: top bar icons 24dp inside 48dp round targets, as in Google's apps */
 :root[data-ui="material"] .topbar .ghost.icon { width: 48px; height: 48px; min-width: 48px; padding: 0; display: inline-grid; place-items: center; border-radius: 50%; font-size: 24px; line-height: 1; }
 :root[data-ui="material"] .topbar .ghost.icon svg, :root[data-ui="material"] .topbar .ghost.icon .ico { width: 24px !important; height: 24px !important; }
+/* …but the ☰ stays phone-only (the rule above would show it next to the side menu) */
+:root[data-ui="material"] .topbar .ghost.icon.only-mobile { display: none; }
+@media (max-width: 640px) { :root[data-ui="material"] .topbar .ghost.icon.only-mobile { display: inline-grid; } }
 
 /* Liquid Glass on a phone: the tab bar shows icons only (the labels ran into each other), a little bigger */
 @media (max-width: 640px) {
@@ -1654,7 +1655,8 @@ body.calm article.post.sb-post { animation: none !important; }
 :root[data-ui="glass"][data-theme="light"][data-glass="clear"] { --lg-fill: rgba(255,255,255,.32); }
 :root[data-ui="glass"][data-theme="light"][data-glass="frost"] { --lg-fill: rgba(255,255,255,.72); }
 /* refraction: the edges of the glass bend what is behind them (Chromium: desktop app, Android) */
-html.lg-refract:root[data-ui="glass"] { --lg-filter: url(#lg-refract) blur(var(--lg-blur)) saturate(var(--lg-sat)); }
+/* refraction only on the big surfaces (bars, menu, windows): on every card of a feed it cost frames while scrolling */
+html.lg-refract:root[data-ui="glass"] :is(.topbar, nav.bottom, nav.side, .modal, .popmenu, .fab, .msheet) { --lg-filter: url(#lg-refract) blur(var(--lg-blur)) saturate(var(--lg-sat)); }
 
 /* a soft colour field behind everything — glass needs something to show through */
 :root[data-ui="glass"] body::before { content: ""; position: fixed; inset: -12%; z-index: -1; pointer-events: none;
@@ -1783,3 +1785,69 @@ html.lg-refract:root[data-ui="glass"] { --lg-filter: url(#lg-refract) blur(var(-
 body.detail main article.post.is-open { box-shadow: inset 3px 0 0 var(--accent); }
 article.post.kbd-on { box-shadow: inset 3px 0 0 var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 12px; }
 .kbd-help td { padding: 5px 10px 5px 0; vertical-align: top; } .kbd-help kbd { white-space: nowrap; }
+
+/* ---------- audit fixes (16.11.2026, ui-inspector) ---------- */
+/* the ✏️ button never covers forms: settings, own feeds, a new starter pack (as in a chat) */
+body:has(main:is([data-route^="/settings"], [data-route^="/myfeeds/"], [data-route="/starter-packs/new"])) .fab { display: none !important; }
+/* a post opened in a thread stops below the sticky top bar, not under it */
+.post.focus { scroll-margin-top: calc(72px + var(--sat)); }
+/* long names beside a button: the button moves to its own line instead of squeezing the name to 2–4 letters a line */
+@media (max-width: 480px) {
+  .actor { flex-wrap: wrap; }
+  .actor > .who { min-width: 45%; }
+  .actor > :is(button, .btn, .fbtns):last-child { margin-left: auto; }
+}
+.fbtns { display: flex; gap: 4px; flex: none; }
+@media (max-width: 480px) { .fbtns { flex-wrap: wrap; width: 80px; justify-content: flex-end; } }
+/* Accounts: the «×» stays in the row */
+.accrow .who { min-width: 0; }
+.accrow > :is(button, .btn, .ghost) { flex-shrink: 0; }
+@media (max-width: 480px) { .accrow { flex-wrap: nowrap; } }
+/* segmented controls on a phone (and with big text): equal parts, labels on two lines rather than «Як у сист…» */
+@media (max-width: 480px) {
+  .seg > * { flex: 1 1 0; min-width: 4.5em; white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+    line-height: 1.2; padding-left: 6px; padding-right: 6px; overflow-wrap: break-word; hyphens: auto; }
+}
+/* the photo viewer is always on the dark backdrop (glass and Material put it on a white card in the light theme) */
+:root[data-ui] .modal-bg.dark > .modal { background: none !important; border: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+/* Liquid Glass, light theme, a coloured page: the blur under the top bar takes the page colour, so its ink stays readable */
+@media (max-width: 640px) {
+  :root[data-ui="glass"][data-theme="light"] main.sb-tint .topbar::before { background: linear-gradient(to bottom, color-mix(in srgb, var(--sb) 80%, transparent) 0, color-mix(in srgb, var(--sb) 45%, transparent) calc(var(--sat) + 30px), transparent 100%); }
+}
+:root[data-ui="glass"][data-theme="light"] main.sb-tint .topbar { background: color-mix(in srgb, var(--sb) 55%, transparent); }
+/* «Позначити прочитаним» and alike: only the icon on a phone, so the title keeps room */
+@media (max-width: 480px) { .wide-only { display: none; } }
+/* danger text and buttons: a deeper red on light backgrounds (3.5:1 → 4.8:1) */
+[data-theme="light"] { --danger: #c81e1e; }
+/* the right-column profile card: the bee and the flag stay on the name's line */
+.sp-name b { overflow-wrap: anywhere; }
+.sp-name .bee, .sp-name svg { display: inline; vertical-align: -3px; }
+/* Material side menu: «Для новеньких UA» on one line */
+:root[data-ui="material"] nav.side a .nl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* touch targets at least 44×44 on touch screens (chat reactions, small buttons, chips, top bar icons) */
+@media (pointer: coarse) {
+  .react { min-height: 32px; padding: 4px 10px; position: relative; }
+  .react::after, .chip::after, .nchip::after { content: ""; position: absolute; inset: -6px -2px; }
+  :is(.btn, .ghost).sm { min-height: 44px; }
+  .chip, .nchip { position: relative; min-height: 36px; }
+  .topbar .ghost.icon { min-width: 44px; min-height: 44px; }
+}
+/* screen-reader-only text (the live region for toasts) */
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* page zoom is allowed now; inputs keep 16px on phones so iOS does not zoom in on focus */
+@media (pointer: coarse) { input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), textarea, select { font-size: max(16px, 1em); } }
+/* the composer's text box has no outline of its own: its frame shows the focus instead */
+.composer:focus-within { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 12px; }
+/* cards reached with Tab: the focus ring sits inside, so it is not cut by the column edges */
+:is(article.post, .actor, .quote)[tabindex]:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+:is(article.post, .actor, .quote)[tabindex]:focus:not(:focus-visible) { outline: none; }
+/* the frame of fields is visible enough to find them (WCAG 1.4.11: 3:1) */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]), textarea, select { border-color: color-mix(in srgb, var(--text) 38%, var(--bg)); }
+
+/* ---------- performance (audit 16.11.2026) ---------- */
+/* posts off screen are not laid out or painted (a long feed kept every one of hundreds of glass cards alive) */
+.plist > article.post, #feedBody article.post { content-visibility: auto; contain-intrinsic-size: auto 240px; }
+/* the small buttons under a post do not blur what is behind them: dozens of extra glass layers in a feed */
+:root[data-ui="glass"] article.post .actions :is(button, .btn, .ghost) { -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* the photo viewer's buttons are big enough to hit */
+.lb-btn, .lb-prev, .lb-next { min-width: 44px; min-height: 44px; }

@@ -19,8 +19,9 @@ on:
         required: false
         default: ""
 
+# read-only by default: only the job that publishes the release may write (a compromised build step cannot touch releases)
 permissions:
-  contents: write
+  contents: read
 
 env:
   # тег релізу: з пушу тегу або з ручного запуску
@@ -192,6 +193,8 @@ jobs:
   # обидва файли — в один тестовий реліз (і в реліз тегу), коли обидві збірки готові
   publish:
     needs: [android, ios]
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
