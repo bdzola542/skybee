@@ -111,11 +111,14 @@ export const forgetHomeTabs = () => { tabsCache = null; };
 
 export async function home(el) {
   el.innerHTML = `<div class="topbar">${MENU_BTN}<h2 class="brand">${bee(28)} Skybee</h2><div class="grow"></div>${gridBtn("home")}</div><div class="tabs" id="feedTabs"></div><div id="feedBody"></div>`;
-  const bar = $(".topbar", el); // the feed tabs stick right under it
-  if (bar) new ResizeObserver(() => el.style.setProperty("--tbh", bar.offsetHeight + "px")).observe(bar);
   const tabs = await homeTabs();
   let sel = 0; try { sel = Math.min(+sessionStorage.getItem("skybee.tab") || 0, tabs.length - 1); } catch {}
   const tabEl = $("#feedTabs", el), body = $("#feedBody", el);
+  // the feed tabs stay under the top bar while the feed scrolls (CSS #feedTabs, top: var(--tbh)); the bar's height differs by style
+  const bar = $(".topbar", el);
+  // (and «↑ Нові пости» below the tabs: --tabh is 0 where the tabs are hidden — wide screens, phone sideways)
+  const sizes = window.ResizeObserver && new ResizeObserver(() => { el.style.setProperty("--tbh", bar.offsetHeight + "px"); el.style.setProperty("--tabh", tabEl.offsetHeight + "px"); });
+  if (bar && sizes) { sizes.observe(bar); sizes.observe(tabEl); }
   // Every feed keeps its own pane: switching back is instant (nothing is reloaded, the place in the list is remembered);
   // the panes are dropped by «↑ Нові пости», the grid switch and a pull to refresh (the screen is drawn again)
   const panes = new Map();
@@ -209,7 +212,7 @@ export async function home(el) {
   const pick = (e) => { show(Math.min(e.detail, tabs.length - 1)); };
   window.addEventListener("skybee:pickfeed", pick);
   show(sel);
-  return () => { drop(); clearInterval(watch); window.removeEventListener("skybee:pickfeed", pick); };
+  return () => { drop(); clearInterval(watch); sizes?.disconnect(); window.removeEventListener("skybee:pickfeed", pick); };
 }
 
 /* ================= SINGLE FEED / LIST ================= */
@@ -518,53 +521,64 @@ const NREASONS = {
   likes: ["like", "like-via-repost"], reposts: ["repost", "repost-via-repost"], posts: ["subscribed-post"],
 };
 
+const nGroups = new Map();
+const NWHO_TITLE = { follow: "Нові читачі", "starterpack-joined": "Приєдналися через ваш стартовий набір" };
+// «X і ще 6 стежать за вами» (on the Notifications screen and in a deck column): a tap shows the whole group, not just the last of them
+document.addEventListener("click", (e) => {
+  const row = e.target.closest?.("[data-nwho]");
+  if (!row || e.target.closest("a, button")) return;
+  const who = nGroups.get(row.dataset.nwho) || [];
+  if (!who.length) { location.hash = row.dataset.fallback || "#/notifications"; return; }
+  modal(`<h3>${NWHO_TITLE[row.dataset.reason] || "Нові читачі"}</h3><div class="nwho">${who.map(a => renderActor(a)).join("")}</div>`);
+});
 export async function notifications(el, { filter = "" }) {
   if (!NFILTERS.some(f => f[0] === filter)) filter = "";
   el.innerHTML = header("Сповіщення", false, `<button class="ghost sm" data-act="markRead">Позначити прочитаним</button>`) +
     `<div class="nchips">${NFILTERS.map(([k, l]) => `<a class="nchip${k === filter ? " on" : ""}" href="#/notifications${k ? "/" + k : ""}">${l}</a>`).join("")}</div>`;
   el.querySelector(".nchip.on")?.scrollIntoView({ inline: "center", block: "nearest" });
-  swipeFilters(el, filter);
+  const swipeOff = new AbortController();
+  // swiping the list sideways goes to the next or previous filter chip, like the feeds on Home (not from the left edge: «Back»)
+  {
+    const cur = NFILTERS.findIndex(f => f[0] === filter);
+    let x0 = null, y0 = 0, dx = 0, horiz = null, list = null;
+    const on = { passive: true, signal: swipeOff.signal }; // #main is shared by all screens: these go when the screen goes
+    const look = (x, o, t) => { if (!list) return; list.style.transition = t || "none"; list.style.transform = x ? `translateX(${x}px)` : ""; list.style.opacity = o ?? ""; };
+    el.addEventListener("touchstart", (e) => {
+      const t = e.touches[0];
+      x0 = e.touches.length === 1 && t.clientX > 36 && !e.target.closest(".nchips, .topbar, input, textarea, video, iframe, .playwrap") ? t.clientX : null;
+      y0 = t.clientY; dx = 0; horiz = null; list = el.querySelector(".nchips")?.nextElementSibling;
+    }, on);
+    el.addEventListener("touchmove", (e) => {
+      if (x0 == null) return;
+      const t = e.touches[0]; dx = t.clientX - x0;
+      const dy = t.clientY - y0;
+      if (horiz === null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) horiz = Math.abs(dx) > Math.abs(dy) * 1.4;
+      if (!horiz) return;
+      const edge = (dx > 0 && cur === 0) || (dx < 0 && cur === NFILTERS.length - 1);
+      look(edge ? dx * .15 : dx * .55, String(1 - Math.min(Math.abs(dx) / 700, .3)));
+    }, on);
+    const end = () => {
+      if (x0 == null) return;
+      x0 = null;
+      if (!horiz) return;
+      const go = Math.abs(dx) > 70 ? cur + (dx < 0 ? 1 : -1) : cur;
+      if (go === cur || go < 0 || go >= NFILTERS.length) return look(0, "", "transform .3s var(--ease-move, ease-out), opacity .22s");
+      look((dx < 0 ? -1 : 1) * 140, "0", "transform .16s ease-in, opacity .16s");
+      setTimeout(() => { if (swipeOff.signal.aborted) return; const k = NFILTERS[go][0]; location.hash = "#/notifications" + (k ? "/" + k : ""); }, 160);
+    };
+    el.addEventListener("touchend", end, on);
+    el.addEventListener("touchcancel", () => { x0 = null; look(0, ""); }, on);
+  }
   const seenAt = new Date().toISOString();
   let marked = false;
   const page = notifPager({ filter });
-  return paged(el, async (cursor) => {
+  const stop = paged(el, async (cursor) => {
     const r = await page(cursor);
     if (!marked) { marked = true; api.post("app.bsky.notification.updateSeen", { seenAt }).then(() => window.dispatchEvent(new Event("skybee:badge"))).catch(() => {}); }
     return r;
   });
-}
-
-// Swipe sideways over the list: the next / previous filter («Усе» → «Від тих, за ким стежу» → …); the list follows the finger.
-// Not from the left edge («Back» in the apps) and not over the chip row, which scrolls by itself
-function swipeFilters(el, filter) {
-  el._swipe?.abort();
-  const ac = el._swipe = new AbortController(), o = { signal: ac.signal, passive: true };
-  const L = () => el.querySelector(".plist");
-  const idx = NFILTERS.findIndex(f => f[0] === filter);
-  let x0 = null, y0 = 0, dx = 0, horiz = null;
-  const look = (x, t) => { const l = L(); if (!l) return; l.style.transition = t || "none"; l.style.transform = x ? `translateX(${x}px)` : ""; };
-  el.addEventListener("touchstart", (e) => {
-    const t = e.touches[0];
-    x0 = e.touches.length === 1 && t.clientX > 36 && !e.target.closest("input, textarea, .topbar, .nchips, video") ? t.clientX : null;
-    y0 = t.clientY; dx = 0; horiz = null;
-  }, o);
-  el.addEventListener("touchmove", (e) => {
-    if (x0 == null) return;
-    const t = e.touches[0]; dx = t.clientX - x0; const dy = t.clientY - y0;
-    if (horiz === null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) horiz = Math.abs(dx) > Math.abs(dy) * 1.4;
-    if (!horiz) return;
-    const edge = (dx > 0 && idx === 0) || (dx < 0 && idx === NFILTERS.length - 1);
-    look(edge ? dx * .12 : dx * .55);
-  }, o);
-  const end = () => {
-    if (x0 == null) return; x0 = null;
-    if (!horiz) return;
-    const go = Math.abs(dx) > 70 ? idx + (dx < 0 ? 1 : -1) : idx;
-    if (go === idx || go < 0 || go >= NFILTERS.length) return look(0, "transform .3s var(--ease-move, ease-out)");
-    look(dx < 0 ? -120 : 120, "transform .14s ease-in");
-    setTimeout(() => { const k = NFILTERS[go][0]; location.hash = "#/notifications" + (k ? "/" + k : ""); }, 120);
-  };
-  el.addEventListener("touchend", end, o); el.addEventListener("touchcancel", end, o);
+  const f = await stop;
+  return () => { swipeOff.abort(); f?.(); };
 }
 
 const TEXTY = ["reply", "mention", "quote", "subscribed-post"];
@@ -632,7 +646,7 @@ export const notifPager = ({ filter, as } = {}) => {
         const subs = g.items.map(i => postsBy.get(i.reasonSubject)).filter(Boolean);
         const k = g.items.length;
         html.push(`<div class="notif${unread}" data-href="${profileHref(n.author)}">
-          <div class="nicon r-${g.reason}">${NICON[g.reason]}</div>
+          <div class="nicon r-${esc(g.reason)}">${NICON[g.reason]}</div>
           <div class="grow">
             <div class="avas"><a href="${profileHref(n.author)}">${avatar(n.author, 30)}</a></div>
             <div><a href="${profileHref(n.author)}"><b>${name(n.author)}</b></a> ${g.reason === "like" ? "вподобав(-ла)" : "поширив(-ла)"} ${k} ${plural(k, "ваш пост", "ваші пости", "ваших постів")} <span class="muted small">· ${ago(n.indexedAt)}</span></div>
@@ -645,15 +659,21 @@ export const notifPager = ({ filter, as } = {}) => {
       const who = g.items.map(i => i.author);
       const subj = postsBy.get(n.reasonSubject);
       const others = who.length > 1 ? ` і ще ${who.length - 1}` : "";
-      const many = who.length > 1; // tap the card: the full list of people (the post is opened from the link under it)
-      html.push(`<div class="notif${unread}" ${many ? "data-nlist" : `data-href="${subj ? postLink(subj) : profileHref(n.author)}"`}>
-        <div class="nicon r-${g.reason}">${NICON[g.reason] || "🔔"}</div>
+      // a group without a post (new followers, joins through a starter pack): a tap shows all of them
+      let group = "";
+      if (!as && who.length > 1 && (g.reason === "follow" || g.reason === "starterpack-joined")) {
+        group = n.uri; nGroups.delete(group); nGroups.set(group, who); // keyed by the notification: a re-check rewrites, not adds
+        if (nGroups.size > 300) nGroups.delete(nGroups.keys().next().value);
+      }
+      const many = !group && who.length > 1; // other groups (likes, reposts…): a tap opens the list of people right in the card (the post is opened from the link under it)
+      html.push(`<div class="notif${unread}" ${group ? `data-nwho="${esc(group)}" data-reason="${esc(g.reason)}" data-fallback="${esc(profileHref(n.author))}"` : many ? "data-nlist" : `data-href="${subj ? postLink(subj) : profileHref(n.author)}"`}>
+        <div class="nicon r-${esc(g.reason)}">${NICON[g.reason] || "🔔"}</div>
         <div class="grow">
           <div class="avas">${who.slice(0, 6).map(a => `<a href="${profileHref(a)}">${avatar(a, 30)}</a>`).join("")}</div>
-          <div class="nline"><span class="grow"><a href="${profileHref(n.author)}"><b>${name(n.author)}</b></a>${others} ${NREASON[g.reason] || g.reason} <span class="muted small">· ${ago(n.indexedAt)}</span></span>
+          <div class="nline"><span class="grow"><a href="${profileHref(n.author)}"><b>${name(n.author)}</b></a>${others} ${NREASON[g.reason] || esc(g.reason)} <span class="muted small">· ${ago(n.indexedAt)}</span></span>
             ${g.reason === "follow" && g.items.length === 1 ? followBtn(n.author) : ""}</div>
           ${subj ? `<div class="muted small clip">${esc(subj.record?.text || "")}</div>` : ""}
-          ${many ? `<details class="nall nwho"><summary class="linklike small">Показати всіх (${who.length}) →</summary>${who.map(a =>
+          ${many ? `<details class="nall nwhol"><summary class="linklike small">Показати всіх (${who.length}) →</summary>${who.map(a =>
             `<a class="actor nwhorow" href="${profileHref(a)}">${avatar(a, 36)}<span class="who"><b>${name(a)}</b><span class="muted small">${at(a.handle)}</span></span></a>`).join("")}
             ${subj ? `<a class="nsub small" href="${postLink(subj)}">До посту →</a>` : ""}</details>` : ""}
         </div></div>`);
@@ -919,6 +939,7 @@ export async function convo(el, { id }) {
     };
   }
   const seen = new Set(), byId = new Map();
+  let olderTimer = 0, stopOlder = () => {};
   const bubble = (m) => {
     const mine = m.sender?.did === session.did;
     const del = m.$type === "chat.bsky.convo.defs#deletedMessageView";
@@ -1026,10 +1047,27 @@ export async function convo(el, { id }) {
   let older = first.cursor;
   if (older) {
     box.insertAdjacentHTML("beforebegin", `<button class="ghost more" data-older>Раніші повідомлення</button>`);
-    el.querySelector("[data-older]").onclick = async (e) => {
-      const d = await api.chat("chat.bsky.convo.getMessages", { convoId: id, limit: 50, cursor: older });
-      render(d.messages.reverse(), true); older = d.cursor; if (!older) e.target.remove();
+    // earlier messages come by themselves when the top is reached (and by the button); the view stays where it was
+    const btn = el.querySelector("[data-older]");
+    let busy = false;
+    const more = async () => {
+      if (busy || !older || !btn.isConnected) return;
+      busy = true; btn.disabled = true;
+      try {
+        const d = await api.chat("chat.bsky.convo.getMessages", { convoId: id, limit: 50, cursor: older });
+        if (!btn.isConnected) return; // the screen was left meanwhile
+        // keep the message that was on top where it was (the page has overflow-anchor off for the chat)
+        const first = box.querySelector(".msg"), y0 = first?.getBoundingClientRect().top;
+        render(d.messages.reverse(), true); older = d.cursor;
+        if (first) scrollBy(0, first.getBoundingClientRect().top - y0);
+        if (!older) { io.disconnect(); btn.remove(); }
+      } catch (ex) { toast(errText(ex)); }
+      busy = false; btn.disabled = false;
     };
+    btn.onclick = more;
+    const io = new IntersectionObserver((es) => { if (es.some(x => x.isIntersecting)) more(); }, { rootMargin: "300px 0px 0px 0px" });
+    olderTimer = setTimeout(() => io.observe(btn), 800); // not at once: the screen opens scrolled to the newest message
+    stopOlder = () => { clearTimeout(olderTimer); io.disconnect(); };
   }
   api.chatPost("chat.bsky.convo.updateRead", { convoId: id }).then(() => window.dispatchEvent(new Event("skybee:badge"))).catch(() => {});
   ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
@@ -1057,7 +1095,7 @@ export async function convo(el, { id }) {
       }
     } catch {}
   }, 5000);
-  return () => clearInterval(poll);
+  return () => { clearInterval(poll); stopOlder(); };
 }
 
 export async function startDm(did) {
