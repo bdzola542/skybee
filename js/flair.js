@@ -51,7 +51,7 @@ function clean(v) {
 }
 
 // The launch animation (js/splash.js) runs before anything is loaded: it reads the colour of the signed-in account from here
-function rememberColor(did, c) { try { c ? localStorage.setItem("skybee.pc." + did, c) : localStorage.removeItem("skybee.pc." + did); } catch {} }
+function rememberColor(did, c) { try { c ? localStorage.setItem("skybee.pc@" + did, c) : localStorage.removeItem("skybee.pc@" + did); } catch {} }
 // Privacy: opening someone's profile must never make their server see your IP address.
 // - the record of someone on the official servers is read from there; anyone else's goes through Slingshot, a public record cache (microcosm.blue),
 //   which fetches it from their server instead of you; accounts without a did:plc (their address is a website) are not read at all

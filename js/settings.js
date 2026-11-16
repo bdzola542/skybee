@@ -23,6 +23,17 @@ const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
   set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
 };
+// The app colour belongs to the account (switching accounts switches the colour). An older device-wide value
+// goes to the account that is open the first time this runs.
+const ownDid = () => { try { return JSON.parse(localStorage.getItem("skybee.session"))?.did || ""; } catch { return ""; } };
+const colorKey = () => "skybee.color@" + ownDid();
+export function appColor() {
+  const v = store.get(colorKey());
+  if (v != null) return v;
+  const g = store.get("skybee.color");
+  if (g && ownDid()) { store.set(colorKey(), g); store.set("skybee.color", null); }
+  return g;
+}
 const saved = (promise, undo) => promise.then(() => toast("Збережено"), (ex) => { toast(errText(ex), 5000); undo?.(); });
 // the server refuses some account actions to an app password: say what to do instead of a bare error
 const needMain = (ex) => ex.status === 401 || ex.status === 403 || /token|scope|privileged|Bad token/i.test(ex.message)
@@ -456,7 +467,7 @@ export const refractWorks = () => /Chrome\/|Chromium|Electron/.test(navigator.us
 export function applyLook() {
   const t = store.get("skybee.theme") || "dark";
   const sys = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-  const root = document.documentElement, c = store.get("skybee.color");
+  const root = document.documentElement, c = appColor();
   root.dataset.theme = t === "system" ? sys : t;
   // app colour: the palette of the profile colour (js/flair.js); it replaces the gold accent (buttons, switches, the current tab)
   const ok = isHex(c);
@@ -487,7 +498,7 @@ export function applyLook() {
 }
 export async function appearance(el) {
   const draw = () => {
-    const theme = store.get("skybee.theme") || "dark", font = store.get("skybee.font") || "15", color = store.get("skybee.color") || "";
+    const theme = store.get("skybee.theme") || "dark", font = store.get("skybee.font") || "15", color = isHex(appColor()) ? appColor() : "";
     const uiPick = store.get("skybee.ui") || "auto", ui = uiStyle();
     el.innerHTML = header("Оформлення", true) + `
       <div class="card"><h3>Тема</h3>${seg("th", [["system", "Як у системі"], ["dark", "Темна"], ["dim", "Сутінки"], ["light", "Світла"]], theme)}</div>
@@ -517,10 +528,10 @@ export async function appearance(el) {
         ${toggle("mRipple", "Хвиля при натисканні", store.get("skybee.mRipple") !== "0", "Кругла «хвиля» від пальця на кнопках і пунктах")}
       </div>` : ""}`;
     el.querySelectorAll("[data-th]").forEach(b => b.onclick = () => { store.set("skybee.theme", b.dataset.th); applyLook(); draw(); });
-    el.querySelectorAll("[data-color]").forEach(b => b.onclick = () => { store.set("skybee.color", b.dataset.color || null); applyLook(); draw(); });
+    el.querySelectorAll("[data-color]").forEach(b => b.onclick = () => { store.set(colorKey(), b.dataset.color || ""); applyLook(); draw(); });
     const any = el.querySelector("[data-anycolor]");
-    any.oninput = () => { store.set("skybee.color", any.value.toLowerCase()); applyLook(); }; // live while the picker is open
-    any.onchange = () => { store.set("skybee.color", any.value.toLowerCase()); applyLook(); draw(); };
+    any.oninput = () => { store.set(colorKey(), any.value.toLowerCase()); applyLook(); }; // live while the picker is open
+    any.onchange = () => { store.set(colorKey(), any.value.toLowerCase()); applyLook(); draw(); };
     el.querySelectorAll("[data-font]").forEach(b => b.onclick = () => { store.set("skybee.font", b.dataset.font); applyLook(); draw(); });
     el.querySelectorAll("[data-fl]").forEach(b => b.onclick = () => { store.set("skybee.feedLook", b.dataset.fl || null); applyLook(); draw(); });
     el.querySelectorAll("[data-intro]").forEach(b => b.onclick = () => { store.set("skybee.intro", b.dataset.intro === "full" ? null : b.dataset.intro); draw(); });
@@ -667,6 +678,7 @@ export async function about(el) {
   $("#resetlocal", el).onclick = async () => {
     if (!await confirmBox("Скинути налаштування цього пристрою?", "Скинути", true)) return;
     for (const k of ["theme", "color", "ui", "glass", "glassFloat", "lgTilt", "lgRefract", "intro", "mTonal", "mLabels", "mRipple", "font", "lang", "tlang", "contentLangs", "requireAlt", "calm", "autogif", "players", "flairAll", "feedLook", "postColors", "tenorKey", "noLinkThumbs", "draft"]) store.set("skybee." + k, null);
+    store.set(colorKey(), null);
     location.reload();
   };
 }

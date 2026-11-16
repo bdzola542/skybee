@@ -1783,7 +1783,7 @@ html.feeds-hide .newpill { top: calc(12px + var(--sat)); }
 body.calm #feedTabs { transition: none; }
 
 /* «N people …» in notifications: the opened list of people */
-.nwho[open] > summary { margin-bottom: 6px; }
+.nwhol[open] > summary { margin-bottom: 6px; }
 .nwhorow { display: flex; align-items: center; gap: 10px; padding: 6px 0; color: var(--text); }
 .nwhorow .who { display: flex; flex-direction: column; min-width: 0; }
 [data-nlist] { cursor: pointer; }
@@ -1818,3 +1818,13 @@ body.fl-mosaic .tiles .tile:nth-child(3n+2) { aspect-ratio: 1; }
 body.fl-mosaic .tiles .tile:nth-child(3n) { aspect-ratio: 4 / 5; }
 body.fl-mosaic .dbody .tiles { column-count: 2; }
 body.fl-mosaic .tiles .tile { display: block; }
+/* ---------- the feed tabs stay in sight: under the top bar while the feed scrolls (views.js sets --tbh) ---------- */
+#feedTabs { position: sticky; top: var(--tbh, 54px); z-index: 9; background: var(--bg); }
+:root[data-ui="material"].scrolled #feedTabs { background: var(--m-s2); }
+:root[data-ui="glass"] #feedTabs { background: color-mix(in srgb, var(--bg) 62%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6); }
+.chat { overflow-anchor: none; } /* views.js keeps the place itself when earlier messages come in */
+/* «↑ Нові пости» sits below the sticky feed tabs where they are shown */
+#feedTabs + .newpill { top: calc(var(--tbh, 54px) + var(--tabh, 0px) + 10px); }
+@media (pointer: coarse) { .nchips + * { touch-action: pan-y; } } /* sideways on the notifications list switches the filter (views.js) */
+html.feeds-hide #feedTabs + .newpill { top: calc(var(--tbh, 54px) + 10px); }

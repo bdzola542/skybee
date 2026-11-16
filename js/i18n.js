@@ -22,6 +22,7 @@ export const UI_LANGS = [
   ["nl", "Nederlands", "eu", () => import("./i18n/nl.js")],
   ["ro", "Română", "eu", () => import("./i18n/ro.js")],
   ["bg", "Български", "eu", () => import("./i18n/bg.js")],
+  ["crh", "Qırımtatarca", "eu", () => import("./i18n/crh.js")],
 ];
 // languages of the «eu» group fall back to English where their dictionary has no line yet (not to Ukrainian)
 const EN = () => import("./i18n/en.js");
