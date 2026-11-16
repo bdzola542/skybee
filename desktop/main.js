@@ -204,6 +204,13 @@ function setupTray() {
   tray.on("right-click", () => tray.setContextMenu(build()));
 }
 
+ipcMain.handle("skybee:icon", (_e, png) => {
+  if (typeof png !== "string" || !/^data:image\/png;base64,[A-Za-z0-9+/=]{20,400000}$/.test(png)) return false;
+  const img = nativeImage.createFromDataURL(png);
+  if (img.isEmpty()) return false;
+  try { win?.setIcon(img); tray?.setImage(img.resize({ width: 16, height: 16 })); } catch { return false; }
+  return true;
+});
 ipcMain.handle("skybee:version", () => app.getVersion());
 const external = (url) => { if (/^(https?|mailto):/i.test(url)) shell.openExternal(url); };
 

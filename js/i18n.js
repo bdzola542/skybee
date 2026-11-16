@@ -24,6 +24,12 @@ export const UI_LANGS = [
   ["bg", "Български", "eu", () => import("./i18n/bg.js")],
   ["crh", "Qırımtatarca", "eu", () => import("./i18n/crh.js")],
 ];
+// Language lists go A–Z by the Ukrainian name of the language (the labels themselves stay in each language's own words)
+const UK_NAME = { uk: "Українська", "uk-x-1928": "Українська (1928)", en: "Англійська", pl: "Польська", de: "Німецька", fr: "Французька", es: "Іспанська",
+  it: "Італійська", cs: "Чеська", sk: "Словацька", pt: "Португальська", nl: "Нідерландська", ro: "Румунська", bg: "Болгарська", crh: "Кримськотатарська",
+  be: "Білоруська", ru: "Російська", ja: "Японська" };
+export const sortAZ = (list) => [...list].sort((a, b) => (UK_NAME[a[0]] || a[1]).localeCompare(UK_NAME[b[0]] || b[1], "uk"));
+UI_LANGS.splice(0, UI_LANGS.length, ...sortAZ(UI_LANGS));
 // languages of the «eu» group fall back to English where their dictionary has no line yet (not to Ukrainian)
 const EN = () => import("./i18n/en.js");
 // Soviet spellings of 1933–1990, written to bring Ukrainian closer to Russian, are deliberately not offered.
