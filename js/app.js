@@ -1043,11 +1043,7 @@ document.addEventListener("click", async (e) => {
         break;
       }
       case "logout": if (await confirmBox(`Вийти з акаунта ${at(api.session.handle)}?`, "Вийти", true)) { api.logout(); restart(); } break;
-      case "install": {
-        const prompt = pwa.install; pwa.install = null; actEl.hidden = true;
-        if (prompt) { prompt.prompt(); await prompt.userChoice; }
-        break;
-      }
+      case "install": S.installDialog(); break;
     }
   } catch (ex) { toast(errText(ex)); }
   finally { if (actEl?.isConnected) actEl.disabled = false; }
@@ -1198,8 +1194,7 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) { // t
   navigator.serviceWorker.addEventListener("message", (e) => { if (e.data?.type === "skybee:open") location.hash = e.data.hash; });
 }
 window.addEventListener("beforeinstallprompt", (e) => {
-  pwa.install = e;
-  document.querySelector("[data-act=install]")?.removeAttribute("hidden");
+  pwa.install = e; // «Встановити як застосунок» → «У цьому браузері»
 });
 
 /* ---------- boot ---------- */

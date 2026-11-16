@@ -667,6 +667,14 @@ nav.side .logo, .guestbar .logo { display: flex; align-items: center; gap: 10px;
 .topbar h2.brand { display: flex; align-items: center; gap: 8px; }
 .loginbee { display: flex; justify-content: center; margin-bottom: 4px; }
 .aboutbee { display: flex; justify-content: center; }
+/* «Встановити як застосунок»: a choice of device */
+.instpick { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px; margin: 6px 0; border: 1px solid var(--line); border-radius: 14px; background: none; color: inherit; font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.instpick:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); text-decoration: none; }
+.instpick.mine { border-color: var(--accent); }
+.instpick .ii { font-size: 24px; width: 32px; text-align: center; flex: none; }
+.instpick b { display: block; }
+.instpick small { display: block; color: var(--muted); font-size: 13px; }
+.instpick .tag { font-style: normal; font-size: 11px; font-weight: 600; padding: 1px 7px; margin-left: 6px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); vertical-align: 1px; }
 .theend .bee { vertical-align: -4px; }
 .toast .bee { vertical-align: -4px; margin-left: 2px; }
 .popmenu .bee { vertical-align: -4px; }
