@@ -5,6 +5,7 @@ import { session } from "./api.js";
 import { bee, $, esc, name, vname, at, avatar, empty, spinner, toast, modal, confirmBox, pwa, actors, ico } from "./ui.js";
 import { header } from "./views.js";
 import { getLang } from "./compose.js";
+import * as push from "./push.js";
 import { UI_LANGS, uiLang, setUiLang, isUk } from "./i18n.js";
 import * as notify from "./notify.js";
 import { inkFor, colorsOf } from "./flair.js";
@@ -319,6 +320,7 @@ export async function notifications(el) {
         ? "Надходять, поки Skybee відкритий — у вкладці (навіть фоновій) або як встановлений застосунок."
         : "Цей браузер не підтримує системні сповіщення.", !notify.supported())}
     </div>
+    ${push.supported() ? `<div class="card" id="pushcard"><h3>Push при закритому застосунку</h3>${spinner()}</div>` : ""}
     <div class="card" id="nprefs"><h3>Що показувати в сповіщеннях</h3>${spinner()}</div>`;
   $("#sysnotify", el).onchange = async (e) => {
     if (!e.target.checked) { notify.disable(); return toast("Сповіщення вимкнено"); }
@@ -326,6 +328,7 @@ export async function notifications(el) {
     e.target.checked = false;
     toast("Браузер не дозволив сповіщення. Дозволь їх для цього сайту в налаштуваннях браузера.", 5000);
   };
+  if (push.supported()) pushCard($("#pushcard", el));
   const box = $("#nprefs", el);
   let prefs;
   try { prefs = await api.getNotifPrefs(); }
@@ -346,6 +349,39 @@ export async function notifications(el) {
   });
   box.querySelectorAll("[data-include]").forEach(s => s.onchange = () => put(s.dataset.include, { include: s.value, list: true, push: prefs[s.dataset.include]?.push ?? true }));
   $("[data-chat]", box).onchange = (e) => put("chat", { include: e.target.value, push: prefs.chat?.push ?? true });
+}
+
+// Web Push: the server on skybee.online checks the account once a minute with an app password and pushes news to this device
+async function pushCard(card) {
+  const draw = async () => {
+    const on = await push.active();
+    card.innerHTML = `<h3>Push при закритому застосунку</h3>` + (on
+      ? `<p class="small">✅ Увімкнено на цьому пристрої: сповіщення й нові повідомлення приходять, навіть коли Skybee закритий.</p><button class="ghost" id="pushoff">Вимкнути й видалити пароль із сервера</button>`
+      : `<p class="small muted">Сервер Skybee раз на хвилину питає Bluesky про нове й надсилає push. Для цього потрібен <b>окремий пароль застосунку</b>
+          (Bluesky → Налаштування → Паролі застосунків). Щоб приходили й чати — постав галочку <b>«Allow access to your direct messages»</b>.
+          Пароль зберігається на сервері зашифрованим, вимкнення його видаляє; у будь-який момент його можна відкликати в Bluesky.</p>
+        <label class="field">Пароль застосунку<input id="pushpw" type="password" autocomplete="off" spellcheck="false" placeholder="xxxx-xxxx-xxxx-xxxx"></label>
+        <button class="btn" id="pushon">Увімкнути push</button><p class="err small" id="pusherr"></p>`);
+    $("#pushoff", card)?.addEventListener("click", async () => { try { await push.disable(); toast("Push вимкнено"); } catch (ex) { toast("Сервер push недоступний — пароль ще на ньому. Спробуй вимкнути пізніше.", 5000); } draw(); });
+    $("#pushon", card)?.addEventListener("click", async (e) => {
+      const pw = $("#pushpw", card).value.trim(), err = $("#pusherr", card);
+      if (!pw) { err.textContent = "Встав пароль застосунку"; return; }
+      e.target.disabled = true; err.textContent = "";
+      try {
+        const { chat } = await push.enable(pw);
+        toast(chat ? "Push увімкнено, чати теж" : "Push увімкнено, але без чатів: у цьому паролі немає доступу до повідомлень", 5000);
+        draw();
+      } catch (ex) {
+        e.target.disabled = false;
+        err.textContent = ex.code === "mainpw" ? "Це основний пароль. Створи пароль застосунку: Bluesky → Налаштування → Паролі застосунків."
+          : ex.code === "login" ? "Bluesky не прийняв цей пароль. Потрібен саме пароль застосунку, не основний."
+          : ex.code === "denied" ? "Браузер не дозволив сповіщення. Дозволь їх для цього сайту в налаштуваннях браузера."
+          : ex.code === "rate" ? "Забагато спроб. Спробуй за годину."
+          : ex.code === "sw" || ex.code === "server" ? "Сервіс push зараз недоступний. Спробуй пізніше." : errText(ex);
+      }
+    });
+  };
+  draw();
 }
 
 /* ================= CONTENT & MEDIA ================= */

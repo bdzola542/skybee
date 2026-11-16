@@ -18,3 +18,7 @@ reports/
 # локальні секрети
 .env*
 *.keystore
+
+# Web Push на хостингу: секрети й дані лишаються лише на сервері
+hosting/push/config.php
+hosting/push/data/
