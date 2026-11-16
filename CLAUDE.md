@@ -7,6 +7,9 @@ Skybee — відкритий клієнт для Bluesky (AT Protocol). Авт�
 - Зараз це **веб-версія** (vanilla JS, ES-модулі, без збірки і без залежностей).
 - Хостинг: GitHub Pages з гілки `main`, корінь репозиторію → https://vysocavnu.github.io/skybee
   Кожен push у `main` автоматично оновлює сайт.
+  **Власний домен і хостинг NIC.UA**: `.github/workflows/hosting.yml` після змін у `main` (і після щоденного `stars.yml`) заливає сайт по FTP з TLS (або SFTP) через lftp;
+  секрети `HOSTING_HOST`/`HOSTING_USER`/`HOSTING_PASS`, змінні `HOSTING_DIR`, `HOSTING_PROTO`; без секретів — пропускає. `hosting/.htaccess` — сторінки помилок, https, кешування, заголовки безпеки.
+  Новий файл/теку в корені сайту дописати в крок «Зібрати сайт» і в `paths`. Адреси в коді (`SITE` в app.js, stars.js, desktop/main.js) поки ведуть на GitHub Pages.
 - Є **десктопна версія для Windows на Electron** (`desktop/`): лише інсталятор NSIS (переносну версію автор попросив прибрати).
   Саме Electron, а не Tauri: Tauri на Windows потребує WebView2 (Edge), а в автора Edge заблокований — застосунок має нести власний рушій.
   Збирає GitHub Actions (`.github/workflows/desktop.yml`): тег `vX.Y.Z` → реліз; зміни застосунку в `main` (веб чи `desktop/`) або ручний запуск → артефакти і pre-release `desktop-test` із файлами **без ZIP** (`Skybee-Setup.exe`, `Skybee.AppImage`, `Skybee-linux-x64.tar.gz`, `Skybee.flatpak`). Автор хоче готові файли, не архіви: давати посилання на `desktop-test` / `mobile-test`, а не на артефакти.
