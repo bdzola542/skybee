@@ -1445,12 +1445,12 @@ main.nav-tab { animation: sb-tab-in .24s ease-out; }
 @keyframes sb-item-in { from { opacity: 0; translate: 0 10px; } }
 @keyframes ios-item-in { from { opacity: 0; translate: 0 6px; } }
 @keyframes m-item-in { from { opacity: 0; } }
-.plist > :is(.post, .notif, .actor) { animation: sb-item-in .36s var(--ease-move) backwards; }
-:root[data-ui="glass"] .plist > :is(.post, .notif, .actor) { animation-name: ios-item-in; }
-:root[data-ui="material"] .plist > :is(.post, .notif, .actor) { animation-name: m-item-in; animation-duration: .25s; }
-.plist > :nth-child(2) { animation-delay: .03s; } .plist > :nth-child(3) { animation-delay: .06s; }
-.plist > :nth-child(4) { animation-delay: .09s; } .plist > :nth-child(5) { animation-delay: .12s; }
-.plist > :nth-child(6) { animation-delay: .15s; }
+/* only the first screenful arrives with motion, and quickly: the rest (and every next page) just appears */
+.plist > :is(.post, .notif, .actor):nth-child(-n+5) { animation: sb-item-in .2s var(--ease-move) backwards; }
+:root[data-ui="glass"] .plist > :is(.post, .notif, .actor):nth-child(-n+5) { animation-name: ios-item-in; }
+:root[data-ui="material"] .plist > :is(.post, .notif, .actor):nth-child(-n+5) { animation-name: m-item-in; animation-duration: .16s; }
+.plist > :nth-child(2) { animation-delay: .02s; } .plist > :nth-child(3) { animation-delay: .04s; }
+.plist > :nth-child(4) { animation-delay: .06s; } .plist > :nth-child(5) { animation-delay: .08s; }
 
 /* ---------- windows (modal), bottom sheets, the chat message sheet ---------- */
 @keyframes fade-in { from { opacity: 0; } } @keyframes fade-out { to { opacity: 0; } }
