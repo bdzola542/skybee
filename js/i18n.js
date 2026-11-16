@@ -16,6 +16,12 @@ export const UI_LANGS = [
   ["fr", "Français", "eu", () => import("./i18n/fr.js")],
   ["es", "Español", "eu", () => import("./i18n/es.js")],
   ["it", "Italiano", "eu", () => import("./i18n/it.js")],
+  ["cs", "Čeština", "eu", () => import("./i18n/cs.js")],
+  ["sk", "Slovenčina", "eu", () => import("./i18n/sk.js")],
+  ["pt", "Português", "eu", () => import("./i18n/pt.js")],
+  ["nl", "Nederlands", "eu", () => import("./i18n/nl.js")],
+  ["ro", "Română", "eu", () => import("./i18n/ro.js")],
+  ["bg", "Български", "eu", () => import("./i18n/bg.js")],
 ];
 // languages of the «eu» group fall back to English where their dictionary has no line yet (not to Ukrainian)
 const EN = () => import("./i18n/en.js");
@@ -28,6 +34,8 @@ const auto = () => { for (const l of navigator.languages || []) { const b = Stri
 export const uiLang = known(read()) ? read() : auto();
 export const setUiLang = (c) => { try { localStorage.setItem(KEY, c); } catch {} };
 // locale for dates and numbers (private-use tags like uk-x-1928 → uk)
+// the «Для новеньких» guide is about Ukrainian Bluesky: only for Ukrainian and its spellings/dialects
+export const isUk = UI_LANGS.find(l => l[0] === uiLang)?.[2] === "uk";
 export const locale = uiLang.split("-x-")[0];
 
 const CYR = /[А-ЯЁЇІЄҐа-яїієґ]/;

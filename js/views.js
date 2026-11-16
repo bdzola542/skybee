@@ -40,13 +40,15 @@ export const isGrid = (key) => { try { return localStorage.getItem("skybee.grid.
 export const gridBtn = (key) => `<button class="ghost icon" data-grid="${esc(key)}" title="${isGrid(key) ? "Звичайна стрічка" : "Сітка медіа: лише фото й відео"}">${isGrid(key) ? "☰" : "▦"}</button>`;
 // one listener on the screen: flips the mode and redraws through `redraw`
 export function onGrid(el, redraw) {
+  el._grid?.abort(); // the screen element is reused: a second listener would flip the mode twice (and nothing would change)
+  const ac = el._grid = new AbortController();
   el.addEventListener("click", (e) => {
     const b = e.target.closest("[data-grid]"); if (!b) return;
     const k = b.dataset.grid, on = !isGrid(k);
     try { on ? localStorage.setItem("skybee.grid." + k, "1") : localStorage.removeItem("skybee.grid." + k); } catch {}
     b.outerHTML = gridBtn(k);
     redraw(on);
-  });
+  }, { signal: ac.signal });
 }
 
 // hideMuted: in feeds, posts with muted words disappear; elsewhere renderPost collapses them
@@ -54,6 +56,15 @@ export const feedItems = (feed, hideMuted = false, from) => feed.map(it => {
   if (!it.post || (hideMuted && (mutedBy(it.post) || warnLabel(it.post)?.hide))) return "";
   return renderPost(it.post, { reason: it.reason, parent: it.reply?.parent, feed: from, ctx: it.feedContext });
 });
+
+// «📅 У Bluesky з …»: the profile often has no createdAt, then the date comes from the first entry of the account's public DID log
+const joinedLine = (iso) => `📅 У Bluesky з ${new Date(iso).toLocaleDateString(LOC, { day: "numeric", month: "long", year: "numeric" })}`;
+const joinedCache = new Map();
+async function joinedFromLog(did) {
+  if (!did?.startsWith("did:plc:")) return null;
+  if (!joinedCache.has(did)) joinedCache.set(did, fetch(`https://plc.directory/${encodeURIComponent(did)}/log/audit`).then(r => r.ok ? r.json() : []).then(l => l?.[0]?.createdAt || null).catch(() => null).then(v => { if (!v) joinedCache.delete(did); return v; }));
+  return joinedCache.get(did);
+}
 
 /* ================= HOME ================= */
 // «Підписки» without replies / reposts / quotes, as chosen in the settings
@@ -67,8 +78,9 @@ function homeFilter(d) {
 let tabsCache = null, tabsAt = 0;
 export function homeTabs() {
   if (tabsCache && Date.now() - tabsAt < 60000) return tabsCache;
+  const stale = tabsCache; // an older list is shown at once (the home screen must not wait for the network); a fresh one is fetched behind it
   tabsAt = Date.now();
-  return tabsCache = (async () => {
+  const fresh = tabsCache = (async () => {
   const tabs = [{ label: "Підписки", kind: "timeline" }];
   try {
     const saved = (await api.getSavedFeeds()).filter(i => i.pinned && i.type !== "timeline");
@@ -92,31 +104,48 @@ export function homeTabs() {
   try { for (const f of await src.myFeeds()) if (f.pinned) tabs.push({ label: f.name, kind: "my", uri: f.id }); } catch {}
   return tabs;
   })();
+  fresh.catch(() => { if (tabsCache === fresh) tabsCache = stale; });
+  return stale || fresh;
 }
 export const forgetHomeTabs = () => { tabsCache = null; };
 
 export async function home(el) {
-  el.innerHTML = `<div class="topbar">${MENU_BTN}<h2 class="brand">${bee(28)} Skybee</h2><div class="grow"></div>${gridBtn("home")}<button class="ghost icon" data-act="refresh" title="Оновити">↻</button></div><div class="tabs" id="feedTabs"></div><div id="feedBody"></div>`;
+  el.innerHTML = `<div class="topbar">${MENU_BTN}<h2 class="brand">${bee(28)} Skybee</h2><div class="grow"></div>${gridBtn("home")}</div><div class="tabs" id="feedTabs"></div><div id="feedBody"></div>`;
   const bar = $(".topbar", el); // the feed tabs stick right under it
   if (bar) new ResizeObserver(() => el.style.setProperty("--tbh", bar.offsetHeight + "px")).observe(bar);
   const tabs = await homeTabs();
   let sel = 0; try { sel = Math.min(+sessionStorage.getItem("skybee.tab") || 0, tabs.length - 1); } catch {}
   const tabEl = $("#feedTabs", el), body = $("#feedBody", el);
-  let stop;
-  const show = (i) => {
+  // Every feed keeps its own pane: switching back is instant (nothing is reloaded, the place in the list is remembered);
+  // the panes are dropped by «↑ Нові пости», the grid switch and a pull to refresh (the screen is drawn again)
+  const panes = new Map();
+  let cur = null;
+  const drop = () => { for (const p of panes.values()) { p.stop?.(); p.box.remove(); } panes.clear(); cur = null; };
+  tabEl.innerHTML = tabs.map((t, n) => `<button data-tab="${n}">${esc(t.label)}</button>`).join("");
+  const mark = (i) => tabEl.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("on", +b.dataset.tab === i));
+  const show = (i, fresh) => {
+    if (cur) { cur.y = scrollY; cur.box.hidden = true; }
+    if (fresh) drop();
     sel = i; try { sessionStorage.setItem("skybee.tab", i); } catch {}
     window.dispatchEvent(new CustomEvent("skybee:hometab", { detail: i }));
-    tabEl.innerHTML = tabs.map((t, n) => `<button class="${n === i ? "on" : ""}" data-tab="${n}">${esc(t.label)}</button>`).join("");
+    mark(i);
     tabEl.querySelector(".on")?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" }); // a swipe can reach a tab that is off screen
-    stop?.(); body.innerHTML = ""; body.parentElement.querySelectorAll(".sentinel").forEach(s => s.remove());
+    document.documentElement.classList.remove("feeds-hide");
     const t = tabs[i], grid = isGrid("home");
-    pill.hidden = true; latest = null;
-    if (t.kind === "my") { stop = paged(body, src.feedPager({ type: "myfeed", value: t.uri }, { grid }), { cls: grid ? "tiles" : "" }); return; }
-    latest = (cursor, limit = 30) => t.kind === "timeline" ? api.get("app.bsky.feed.getTimeline", { limit, cursor }).then(homeFilter)
+    pill.hidden = true;
+    let p = panes.get(i);
+    if (p && Date.now() - p.at > 600000) { p.stop?.(); p.box.remove(); panes.delete(i); p = null; } // very old: load again
+    if (p) { p.box.hidden = false; cur = p; latest = p.latest; scrollTo(0, p.y || 0); return; }
+    scrollTo(0, 0);
+    const box = document.createElement("div");
+    body.appendChild(box);
+    p = { box, at: Date.now(), y: 0 }; panes.set(i, p); cur = p;
+    if (t.kind === "my") { p.stop = paged(box, src.feedPager({ type: "myfeed", value: t.uri }, { grid }), { cls: grid ? "tiles" : "" }); latest = p.latest = null; return; }
+    latest = p.latest = (cursor, limit = 30) => t.kind === "timeline" ? api.get("app.bsky.feed.getTimeline", { limit, cursor }).then(homeFilter)
       : t.kind === "list" ? api.get("app.bsky.feed.getListFeed", { list: t.uri, limit, cursor })
       : api.get("app.bsky.feed.getFeed", { feed: t.uri, limit, cursor }, api.feedHeaders());
-    stop = paged(body, async (cursor) => {
-      const d = await latest(cursor);
+    p.stop = paged(box, async (cursor) => {
+      const d = await p.latest(cursor);
       return { html: grid ? src.tiles(d.feed) : feedItems(d.feed, true, t.kind === "feed" ? t.uri : undefined), cursor: d.cursor };
     }, { cls: grid ? "tiles" : "" });
   };
@@ -125,16 +154,16 @@ export async function home(el) {
   const pill = document.createElement("button");
   pill.className = "newpill"; pill.hidden = true; pill.textContent = "↑ Нові пости";
   tabEl.after(pill);
-  pill.onclick = () => { scrollTo({ top: 0 }); show(sel); };
+  pill.onclick = () => { scrollTo({ top: 0 }); show(sel, true); };
   const watch = setInterval(async () => {
     if (document.hidden || !latest || !pill.hidden) return;
     try {
       const top = (await latest(undefined, 5)).feed.find(it => it.post)?.post.uri;
-      const shown = body.querySelector("[data-uri]")?.dataset.uri;
-      if (top && shown && top !== shown && !body.querySelector(`[data-uri="${CSS.escape(top)}"]`)) pill.hidden = false;
+      const shown = cur?.box.querySelector("[data-uri]")?.dataset.uri;
+      if (top && shown && top !== shown && !cur.box.querySelector(`[data-uri="${CSS.escape(top)}"]`)) pill.hidden = false;
     } catch {}
   }, 60000);
-  onGrid(el, () => show(sel));
+  onGrid(el, () => show(sel, true));
   tabEl.addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) show(+b.dataset.tab); });
   // Swiping the feed sideways opens the next or previous feed, as in the Bluesky app. The posts follow the finger;
   // the first and the last feed only give a little. Not from the very left edge: that is «Back» in the apps (native.js)
@@ -154,17 +183,21 @@ export async function home(el) {
       if (!horiz) return;
       const edge = (dx > 0 && sel === 0) || (dx < 0 && sel === tabs.length - 1);
       look(edge ? dx * .15 : dx * .55, String(1 - Math.min(Math.abs(dx) / 700, .3)));
+      // the glass bubble in the tab row goes with the finger, between this feed's tab and the next one
+      const to = edge ? sel : sel + (dx < 0 ? 1 : -1);
+      window.dispatchEvent(new CustomEvent("skybee:rowdrag", { detail: { row: tabEl, from: sel, to, p: edge ? 0 : Math.min(Math.abs(dx) / 140, 1) } }));
     }, { passive: true });
     const end = () => {
       if (x0 == null) return;
       x0 = null;
       if (!horiz) return;
+      window.dispatchEvent(new CustomEvent("skybee:rowdrag", { detail: { row: tabEl, end: true } }));
       const go = Math.abs(dx) > 70 ? sel + (dx < 0 ? 1 : -1) : sel;
       if (go === sel || go < 0 || go >= tabs.length) return look(0, "", "transform .3s var(--ease-move, ease-out), opacity .22s");
       const dir = dx < 0 ? -1 : 1;
       look(dir * 140, "0", "transform .16s ease-in, opacity .16s");
       setTimeout(() => {
-        scrollTo({ top: 0 }); show(go);
+        show(go);
         look(-dir * 70, "0");
         requestAnimationFrame(() => requestAnimationFrame(() => look(0, "", "transform .32s var(--ease-move, ease-out), opacity .24s")));
       }, 160);
@@ -172,12 +205,11 @@ export async function home(el) {
     body.addEventListener("touchend", end, { passive: true });
     body.addEventListener("touchcancel", end, { passive: true });
   }
-  el.querySelector("[data-act=refresh]").onclick = () => { scrollTo(0, 0); show(sel); };
   // a feed picked in the right column
-  const pick = (e) => { scrollTo(0, 0); show(Math.min(e.detail, tabs.length - 1)); };
+  const pick = (e) => { show(Math.min(e.detail, tabs.length - 1)); };
   window.addEventListener("skybee:pickfeed", pick);
   show(sel);
-  return () => { stop?.(); clearInterval(watch); window.removeEventListener("skybee:pickfeed", pick); };
+  return () => { drop(); clearInterval(watch); window.removeEventListener("skybee:pickfeed", pick); };
 }
 
 /* ================= SINGLE FEED / LIST ================= */
@@ -348,12 +380,13 @@ export async function profile(el, { actor, tab = "posts" }) {
       ${p.description ? `<div class="bio">${linkify(p.description)}</div>` : ""}
       ${liveCard(p)}
       ${site ? `<div class="small">🔗 <a href="${esc(site)}" target="_blank" rel="noopener">${esc(site.replace(/^https?:\/\//, "").replace(/\/$/, ""))}</a></div>` : ""}
-      ${p.createdAt ? `<div class="muted small">📅 У Bluesky з ${new Date(p.createdAt).toLocaleDateString(LOC, { month: "long", year: "numeric" })}</div>` : ""}
+      <div class="muted small" data-joined>${p.createdAt ? joinedLine(p.createdAt) : ""}</div>
       ${v.knownFollowers?.count ? `<a class="muted small" href="${profileHref(p)}/known" style="display:block">Серед читачів: ${v.knownFollowers.followers.slice(0, 2).map(f => name(f)).join(", ")}${v.knownFollowers.count > 2 ? ` і ще ${v.knownFollowers.count - 2}` : ""}</a>` : ""}`}
     </div>
     ${blocked ? empty(v.blocking ? "Ви заблокували цей акаунт" : "Цей акаунт заблокував вас") :
       `<div class="tabs scroll">${tabs.map(([k, l]) => `<a class="${k === tab ? "on" : ""}" href="${profileHref(p)}${k === "posts" ? "" : "/" + k}">${l}</a>`).join("")}</div><div id="pbody"></div>`}`;
   if (blocked) return;
+  if (!p.createdAt) joinedFromLog(p.did).then(d => { const j = $("[data-joined]", el); if (d && j) j.innerHTML = joinedLine(d); }).catch(() => {});
   flair.decorate(el, p); // Skybee extras arrive on their own, the page does not wait for them
   if (p.associated?.labeler && session) labelerCard($(".phead", el), p).catch(() => {});
   const body = $("#pbody", el);
@@ -490,6 +523,7 @@ export async function notifications(el, { filter = "" }) {
   el.innerHTML = header("Сповіщення", false, `<button class="ghost sm" data-act="markRead">Позначити прочитаним</button>`) +
     `<div class="nchips">${NFILTERS.map(([k, l]) => `<a class="nchip${k === filter ? " on" : ""}" href="#/notifications${k ? "/" + k : ""}">${l}</a>`).join("")}</div>`;
   el.querySelector(".nchip.on")?.scrollIntoView({ inline: "center", block: "nearest" });
+  swipeFilters(el, filter);
   const seenAt = new Date().toISOString();
   let marked = false;
   const page = notifPager({ filter });
@@ -498,6 +532,39 @@ export async function notifications(el, { filter = "" }) {
     if (!marked) { marked = true; api.post("app.bsky.notification.updateSeen", { seenAt }).then(() => window.dispatchEvent(new Event("skybee:badge"))).catch(() => {}); }
     return r;
   });
+}
+
+// Swipe sideways over the list: the next / previous filter («Усе» → «Від тих, за ким стежу» → …); the list follows the finger.
+// Not from the left edge («Back» in the apps) and not over the chip row, which scrolls by itself
+function swipeFilters(el, filter) {
+  el._swipe?.abort();
+  const ac = el._swipe = new AbortController(), o = { signal: ac.signal, passive: true };
+  const L = () => el.querySelector(".plist");
+  const idx = NFILTERS.findIndex(f => f[0] === filter);
+  let x0 = null, y0 = 0, dx = 0, horiz = null;
+  const look = (x, t) => { const l = L(); if (!l) return; l.style.transition = t || "none"; l.style.transform = x ? `translateX(${x}px)` : ""; };
+  el.addEventListener("touchstart", (e) => {
+    const t = e.touches[0];
+    x0 = e.touches.length === 1 && t.clientX > 36 && !e.target.closest("input, textarea, .topbar, .nchips, video") ? t.clientX : null;
+    y0 = t.clientY; dx = 0; horiz = null;
+  }, o);
+  el.addEventListener("touchmove", (e) => {
+    if (x0 == null) return;
+    const t = e.touches[0]; dx = t.clientX - x0; const dy = t.clientY - y0;
+    if (horiz === null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) horiz = Math.abs(dx) > Math.abs(dy) * 1.4;
+    if (!horiz) return;
+    const edge = (dx > 0 && idx === 0) || (dx < 0 && idx === NFILTERS.length - 1);
+    look(edge ? dx * .12 : dx * .55);
+  }, o);
+  const end = () => {
+    if (x0 == null) return; x0 = null;
+    if (!horiz) return;
+    const go = Math.abs(dx) > 70 ? idx + (dx < 0 ? 1 : -1) : idx;
+    if (go === idx || go < 0 || go >= NFILTERS.length) return look(0, "transform .3s var(--ease-move, ease-out)");
+    look(dx < 0 ? -120 : 120, "transform .14s ease-in");
+    setTimeout(() => { const k = NFILTERS[go][0]; location.hash = "#/notifications" + (k ? "/" + k : ""); }, 120);
+  };
+  el.addEventListener("touchend", end, o); el.addEventListener("touchcancel", end, o);
 }
 
 const TEXTY = ["reply", "mention", "quote", "subscribed-post"];
@@ -578,13 +645,17 @@ export const notifPager = ({ filter, as } = {}) => {
       const who = g.items.map(i => i.author);
       const subj = postsBy.get(n.reasonSubject);
       const others = who.length > 1 ? ` і ще ${who.length - 1}` : "";
-      html.push(`<div class="notif${unread}" data-href="${subj ? postLink(subj) : profileHref(n.author)}">
+      const many = who.length > 1; // tap the card: the full list of people (the post is opened from the link under it)
+      html.push(`<div class="notif${unread}" ${many ? "data-nlist" : `data-href="${subj ? postLink(subj) : profileHref(n.author)}"`}>
         <div class="nicon r-${g.reason}">${NICON[g.reason] || "🔔"}</div>
         <div class="grow">
           <div class="avas">${who.slice(0, 6).map(a => `<a href="${profileHref(a)}">${avatar(a, 30)}</a>`).join("")}</div>
           <div class="nline"><span class="grow"><a href="${profileHref(n.author)}"><b>${name(n.author)}</b></a>${others} ${NREASON[g.reason] || g.reason} <span class="muted small">· ${ago(n.indexedAt)}</span></span>
             ${g.reason === "follow" && g.items.length === 1 ? followBtn(n.author) : ""}</div>
           ${subj ? `<div class="muted small clip">${esc(subj.record?.text || "")}</div>` : ""}
+          ${many ? `<details class="nall nwho"><summary class="linklike small">Показати всіх (${who.length}) →</summary>${who.map(a =>
+            `<a class="actor nwhorow" href="${profileHref(a)}">${avatar(a, 36)}<span class="who"><b>${name(a)}</b><span class="muted small">${at(a.handle)}</span></span></a>`).join("")}
+            ${subj ? `<a class="nsub small" href="${postLink(subj)}">До посту →</a>` : ""}</details>` : ""}
         </div></div>`);
     }
     return { html, cursor };

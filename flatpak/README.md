@@ -18,3 +18,12 @@
    `io.github.vysocavnu.skybee.metainfo.xml`, `icon-512.png`.
 3. Відкрити PR у `flathub/flathub` з базою `new-pr`, назва: «Add io.github.vysocavnu.skybee». Далі — відповідати рецензентам.
 Після прийняття оновлення в Flathub: новий реліз → оновити `url`/`sha256` (і `<release>` у metainfo) у репозиторії Flathub.
+
+## Правила Flathub (на що дивляться рецензенти)
+Правила про ШІ (порожні обгортки, код від ШІ, маркування, моделі, телеметрія) для Skybee стосуються так:
+- **Не «порожня веб-обгортка»**: вебчастина лежить усередині пакунка (не завантажується з сайту), є трей, сповіщення, схема `skybee://`, одиничний екземпляр, власне меню. Не видаляти ці інтеграції. Самооновлення вимкнене (`FLATPAK_ID`).
+- **Код має бути підтримуваним**: автор розуміє й супроводжує код; перед подачею — `for f in js/*.js; do node --check --input-type=module < $f; done` і ручна перевірка екранів. Без вигаданих бібліотек і API (залежності — лише `electron`, `electron-updater`).
+- **Прозорість**: застосунок не містить генеративного ШІ, іконка й скріншоти — справжні (`docs/screenshots/`).
+- **Мережа й приватність** описані в metainfo (розділ Privacy): які сторонні сервіси і коли. Власної телеметрії немає. При додаванні нового сервісу — дописати туди.
+- **Дозволи пісочниці** — мінімум (мережа, сокет вікон, звук, GPU); без `--filesystem=home`. Перед подачею: `flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.vysocavnu.skybee.yml` і `… appstream io.github.vysocavnu.skybee.metainfo.xml`.
+- **Вміст**: OARS-оцінка («social-chat», «social-info» — intense) уже вказана.

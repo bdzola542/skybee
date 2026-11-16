@@ -1,7 +1,7 @@
 // Skybee service worker: keeps the app shell available offline and shows notification clicks the way.
 // Network first — a new deploy is picked up at once; the cache is only a fallback without a connection.
-const CACHE = "skybee-shell-v16";
-const SHELL = ["./", "css/style.css", "js/app.js", "js/api.js", "js/ui.js", "js/views.js", "js/compose.js", "js/more.js", "js/settings.js", "js/notify.js", "js/flair.js", "js/sources.js", "js/deck.js", "js/splash.js", "js/errors.js", "js/newbie.js", "js/native.js", "js/stars.js", "js/updates.js", "js/i18n.js", "js/vendor/hls.min.js",
+const CACHE = "skybee-shell-v17";
+const SHELL = ["./", "css/style.css", "js/app.js", "js/api.js", "js/ui.js", "js/views.js", "js/compose.js", "js/more.js", "js/settings.js", "js/notify.js", "js/push.js", "js/flair.js", "js/sources.js", "js/deck.js", "js/splash.js", "js/errors.js", "js/newbie.js", "js/native.js", "js/stars.js", "js/updates.js", "js/i18n.js", "js/vendor/hls.min.js",
   "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon.svg", "icons/favicon.svg", "favicon.ico", "offline.html"];
 
 self.addEventListener("install", (e) => {
@@ -26,4 +26,13 @@ self.addEventListener("notificationclick", (e) => {
     if (tab) { await tab.focus(); tab.postMessage({ type: "skybee:open", hash }); }
     else await self.clients.openWindow(self.registration.scope + hash);
   }));
+});
+
+// Web Push (hosting/push/): the server sends {title, body, hash, tag}; the system shows it even when Skybee is closed
+self.addEventListener("push", (e) => {
+  let m = {};
+  try { m = e.data ? e.data.json() : {}; } catch { m = { body: e.data?.text() }; }
+  e.waitUntil(self.registration.showNotification(String(m.title || "Skybee").slice(0, 120), {
+    body: String(m.body || "").slice(0, 300), tag: m.tag ? String(m.tag).slice(0, 60) : undefined, renotify: !!m.tag, icon: "icons/icon-192.png", badge: "icons/icon-192.png",
+    data: { hash: /^#\/[\w\-\/%.:]*$/.test(m.hash || "") ? m.hash : "#/notifications" } }));
 });

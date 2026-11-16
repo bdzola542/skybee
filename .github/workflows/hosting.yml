@@ -48,6 +48,7 @@ jobs:
           mkdir site
           cp -r index.html 404.html offline.html favicon.ico manifest.webmanifest sw.js css js icons errors data site/
           cp hosting/.htaccess site/
+          mkdir -p site/push && cp hosting/push/lib.php hosting/push/api.php hosting/push/cron.php hosting/push/.htaccess site/push/
           echo "{\"time\": $(date +%s)000}" > site/build.json
       - name: Залити на хостинг
         if: steps.cfg.outputs.ok == '1'

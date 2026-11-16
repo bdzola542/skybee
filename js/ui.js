@@ -55,7 +55,53 @@ const ICO = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   info: '<rect x="4" y="4" width="16" height="14" rx="1.5"/><path d="M9 18l3 3 3-3M12 8v.01M12 11v4"/>',
 };
-export const ico = (n, size = 24) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="width:${size}px;height:${size}px">${ICO[n] || ""}</svg>`;
+// The same icons drawn in the manner of each platform (css shows the set of the chosen interface style, «Стиль інтерфейсу»):
+// Liquid Glass — thin, round, SF-Symbols-like, filled when active; Material — Material Symbols-like, heavier, square-ish shapes.
+// Skybee keeps the neutral line set above. A name without its own drawing falls back to the neutral one.
+const GEAR = "M18.8 9.5L21 10.2V13.8L18.8 14.5L18.6 15.1L19.6 17.1L17.1 19.6L15.1 18.6L14.5 18.8L13.8 21H10.2L9.5 18.8L8.9 18.6L6.9 19.6L4.4 17.1L5.4 15.1L5.2 14.5L3 13.8V10.2L5.2 9.5L5.4 8.9L4.4 6.9L6.9 4.4L8.9 5.4L9.5 5.2L10.2 3H13.8L14.5 5.2L15.1 5.4L17.1 4.4L19.6 6.9L18.6 8.9z";
+const ICO_GL = {
+  home: '<path d="M3.5 10.8L12 3.8l8.5 7V19a1.8 1.8 0 0 1-1.8 1.8H5.3A1.8 1.8 0 0 1 3.5 19z"/><path d="M9.6 20.8v-5a1 1 0 0 1 1-1h2.8a1 1 0 0 1 1 1v5"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.6"/><path d="M15.4 15.4l5.1 5.1"/>',
+  bell: '<path d="M6 16.5v-5a6 6 0 0 1 12 0v5l1.6 2H4.4z"/><path d="M10 20.8a2.2 2.2 0 0 0 4 0"/>',
+  chat: '<path d="M12 3.5c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-.9 0-1.8-.1-2.6-.3L5 20l.9-3.6C4.4 15.1 3.5 13 3.5 10.5c0-3.9 3.8-7 8.5-7z"/>',
+  hash: '<path d="M9.5 4L8 20M16 4l-1.5 16M4.5 9h16M3.5 15h16"/>',
+  deck: '<rect x="3" y="5" width="18" height="14" rx="3.2"/><path d="M9 5v14M15 5v14"/>',
+  list: '<path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.8" cy="6.5" r=".6"/><circle cx="4.8" cy="12" r=".6"/><circle cx="4.8" cy="17.5" r=".6"/>',
+  bookmark: '<path d="M7.2 3.5h9.6a1 1 0 0 1 1 1V20.5l-5.8-4.4-5.8 4.4V4.5a1 1 0 0 1 1-1z"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c.6-3.7 3.7-5.5 7.5-5.5s6.9 1.8 7.5 5.5"/>',
+  users: '<circle cx="9" cy="8.5" r="3.4"/><path d="M2.8 19.8c.5-3.2 3-4.8 6.2-4.8s5.7 1.6 6.2 4.8"/><circle cx="17.2" cy="8" r="2.6"/><path d="M16.8 14.2c2.4-.2 4.1 1.1 4.5 3.6"/>',
+  settings: `<path d="${GEAR}"/><circle cx="12" cy="12" r="3"/>`,
+  pen: '<path d="M16.5 4.5l3 3L8.2 18.8 4 20l1.2-4.2z"/><path d="M14 7l3 3"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  lock: '<rect x="5" y="10.5" width="14" height="10" rx="2.6"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+  shield: '<path d="M12 3.2l7.5 2.8v5.6c0 4.5-3.2 7.9-7.5 9.2-4.3-1.3-7.5-4.7-7.5-9.2V6z"/>',
+  media: '<rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 16l-4.8-4.8L7 19.5"/>',
+  globe: '<circle cx="12" cy="12" r="8.8"/><path d="M3.2 12h17.6M12 3.2c3 3.2 3 14.4 0 17.6M12 3.2c-3 3.2-3 14.4 0 17.6"/>',
+  help: '<circle cx="12" cy="12" r="8.8"/><path d="M9.6 9.6a2.4 2.4 0 1 1 3.4 2.2c-.7.3-1 .9-1 1.6M12 16.8v.01"/>',
+  info: '<rect x="4" y="4.5" width="16" height="12.5" rx="3"/><path d="M9.5 17l2.5 3 2.5-3"/>',
+};
+const ICO_MT = {
+  home: '<path d="M4 10.5L12 4l8 6.5V20h-5.5v-6h-5v6H4z"/>',
+  search: '<circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20"/>',
+  bell: '<path d="M12 3a6 6 0 0 0-6 6v5l-2 3h16l-2-3V9a6 6 0 0 0-6-6z"/><path d="M10 20h4"/>',
+  chat: '<path d="M4 4h16v12H8l-4 4z"/>',
+  hash: '<path d="M9 4L7.5 20M16.5 4L15 20M4 9h16.5M3.5 15H20"/>',
+  deck: '<rect x="3" y="4" width="18" height="16"/><path d="M9 4v16M15 4v16"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/>',
+  bookmark: '<path d="M6 3h12v18l-6-3-6 3z"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 20v-2c0-2.7 5.3-4 8-4s8 1.3 8 4v2z"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2 20v-2c0-2.4 4-3.8 7-3.8s7 1.4 7 3.8v2z"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.5c2 .6 4 1.6 4 3.5v2h-4"/>',
+  settings: `<path d="${GEAR}"/><circle cx="12" cy="12" r="3.2"/>`,
+  pen: '<path d="M3 21v-4.2L16.8 3 21 7.2 7.2 21z"/><path d="M14 5.8l4.2 4.2"/>',
+  plus: '<path d="M12 4v16M4 12h16"/>',
+  lock: '<rect x="4" y="10" width="16" height="11"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+  shield: '<path d="M12 2.5l8 3v6.5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V5.5z"/>',
+  media: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 16l-5-5-9 10"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.1 1-1.1 1.8M12 17v.01"/>',
+  info: '<rect x="3" y="4" width="18" height="14"/><path d="M8 18l4 3 4-3"/>',
+};
+export const ico = (n, size = 24) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="width:${size}px;height:${size}px"><g class="i-sb">${ICO[n] || ""}</g>${ICO_GL[n] ? `<g class="i-gl">${ICO_GL[n]}</g>` : ""}${ICO_MT[n] ? `<g class="i-mt">${ICO_MT[n]}</g>` : ""}</svg>`;
 // the gradient every bee uses, put into the page once
 if (!document.getElementById("beeGold")) document.body.insertAdjacentHTML("afterbegin",
   `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="beeGold" x1="0" y1="0" x2="1" y2="1">

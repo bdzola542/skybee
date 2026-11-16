@@ -1,0 +1,5 @@
+# Закрити від веба все, крім api.php і cron.php: конфіг, ключі, дані підписок, бібліотеку.
+Require all denied
+<FilesMatch "^(api|cron)\.php$">
+    Require all granted
+</FilesMatch>

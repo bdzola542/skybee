@@ -1177,4 +1177,8 @@ export default {
   "і ще {0} {1}": "und {0} weitere {1}",
   "вподобав(-ла) {0} {1}": "hat {0} {1} geliked",
   "поширив(-ла) {0} {1}": "hat {0} {1} repostet",
+  "Показати всіх ({0}) →": "Alle zeigen ({0}) →",
+  "До посту →": "Zum Beitrag →",
+  "🔒 Оформлення Skybee безпечне для твоєї IP-адреси: чужі записи читаються через публічний кеш, а іграшка — з CDN, тож сервер власника профілю тебе не бачить.": "🔒 Skybee-Looks sind für deine IP-Adresse sicher: fremde Einträge werden über einen öffentlichen Cache gelesen, das Spielzeug kommt von einem CDN – der Server des Profilbesitzers sieht dich nie.",
+  "Пошук GIF потребує ключа Tenor (Налаштування → Вміст і медіа). Поки що вибери GIF-файл із пристрою": "Die GIF-Suche braucht einen Tenor-Schlüssel (Einstellungen → Inhalte und Medien). Wähle vorerst eine GIF-Datei von deinem Gerät",
 };

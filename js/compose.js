@@ -302,6 +302,11 @@ export function openComposer(opts = {}, onDone) {
     if (c === "nocard") { card = null; cardFor = null; renderCard(); update(); }
     if (c === "gif" && !busy) {
       if (images.length || video) return toast("GIF не можна поєднати з фото чи відео");
+      if (!tenorKey()) { // no Tenor key: a GIF can still be taken from the device (the key makes the search work: Settings → Content and media)
+        toast("Пошук GIF потребує ключа Tenor (Налаштування → Вміст і медіа). Поки що вибери GIF-файл із пристрою", 5000);
+        m.querySelector('input[type=file]')?.click();
+        return;
+      }
       const g = await gifPicker();
       if (g) { card = g; cardFor = null; renderCard(); update(); }
     }

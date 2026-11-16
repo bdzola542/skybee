@@ -292,6 +292,13 @@ else {
     const ses = require("electron").session.defaultSession;
     ses.setPermissionRequestHandler((wc, perm, cb, d) => cb(allow(perm, d?.requestingUrl || wc?.getURL())));
     ses.setPermissionCheckHandler((wc, perm, origin) => allow(perm, origin && origin + "/"));
+    // the music catalogue answers without CORS headers; the app is its only reader, so they are added here
+    ses.webRequest.onHeadersReceived({ urls: ["https://itunes.apple.com/search*", "https://musicbrainz.org/ws/*"] }, (d, cb) => {
+      const h = { ...d.responseHeaders };
+      for (const k of Object.keys(h)) if (k.toLowerCase() === "access-control-allow-origin") delete h[k];
+      h["Access-Control-Allow-Origin"] = ["*"];
+      cb({ responseHeaders: h });
+    });
     createWindow();
     try { setupTray(); } catch { /* no tray on this system: closing the window quits */ quitting = true; }
     // Flathub forbids apps that fetch and run their own code past it: there updates come only through Flathub
