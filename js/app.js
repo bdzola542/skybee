@@ -25,8 +25,10 @@ let cleanup = null;
 const restart = () => { location.hash = "#/"; location.reload(); };
 const hashQuery = () => new URLSearchParams(location.hash.split("?")[1] || "");
 // the Skybee site: the apps open sign-up there, in the browser; it sends the user back with skybee://login?handle=…
-const SITE = "https://vysocavnu.github.io/skybee/";
+const SITE = "https://skybee.online/";
 const inApp = () => !!window.skybeeDesktop || isNative;
+// address for links people share: in the apps (incl. Android's https://localhost) — the site, in a browser — this page
+const here = () => inApp() || !location.protocol.startsWith("http") ? SITE : location.origin + location.pathname;
 const fullHandle = (h) => { h = String(h || "").trim().toLowerCase().replace(/^@/, "").replace(/[^a-z0-9.@-]/g, ""); return !h || h.includes(".") || h.includes("@") ? h : h + ".bsky.social"; };
 // a login form opened after sign-up: the new handle is filled in, the main password chosen (there is no app password yet).
 // Anyone can make such a link, so it says plainly whose handle it is and warns not to type a password by someone else's link
@@ -99,7 +101,7 @@ function loginScreen() {
     <div class="loginbee">${bee(120)}</div><h1>Skybee</h1>
     <p class="muted">Клієнт для Bluesky</p>
     <form class="card loginform">
-      <p class="hint">Достатньо ввести нік, наприклад <b>@lejk309</b>, або email акаунта. Якщо акаунт не на bsky.social (Eurosky, свій домен) — повний handle.</p>
+      <p class="hint">Достатньо ввести нік, наприклад <b>@user</b>, або email акаунта. Якщо акаунт не на bsky.social (Eurosky, свій домен) — повний handle.</p>
       ${LOGIN_FIELDS}
       <hr>
       <p class="hint">Ще немає акаунта в Bluesky?</p>
@@ -745,7 +747,7 @@ function restoreScroll(k) {
 
 /* ---------- helpers for actions ---------- */
 // A link to the post in Skybee itself; the desktop app has no web address, so it gives the site's one
-const skybeeUrl = (p) => (location.protocol.startsWith("http") ? location.origin + location.pathname : "https://vysocavnu.github.io/skybee/") +
+const skybeeUrl = (p) => here() +
   `#/profile/${encodeURIComponent(p.author?.handle || p.uri.split("/")[2])}/post/${p.uri.split("/").pop()}`;
 const postOf = (el) => posts.get(el.closest("[data-uri]")?.dataset.uri);
 const refreshPostEl = (uri) => {
@@ -1067,7 +1069,7 @@ function reportDialog(subject) {
 
 // Share: the Skybee link (opens even without an account), the bsky.app link and a QR code to scan with a phone
 export function shareDialog(title, hash, bskyUrl) {
-  const sky = (location.protocol.startsWith("http") ? location.origin + location.pathname : "https://vysocavnu.github.io/skybee/") + hash;
+  const sky = here() + hash;
   const m = modal(`<h3>📤 ${title}</h3>
     <div class="qr"><img alt="QR-код" src="https://api.qrserver.com/v1/create-qr-code/?size=440x440&margin=12&data=${encodeURIComponent(sky)}"></div>
     <p class="hint center">Наведи камеру телефона — відкриється в Skybee, навіть без входу</p>

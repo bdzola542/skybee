@@ -9,6 +9,8 @@ const crypto = require("node:crypto");
 
 const BUNDLED = path.join(__dirname, "web"); // the web app as it was when this EXE was built
 const HOME = "app://skybee/";
+// Self-update of the web part stays on GitHub Pages (built only from `main` via PR), not the skybee.online mirror:
+// code that runs in the shell must come from the reviewed repository, not from a separately uploaded host.
 const SITE = (process.env.SKYBEE_SITE || "https://vysocavnu.github.io/skybee/").replace(/\/?$/, "/");
 
 /* ---------- self-updating web part ----------

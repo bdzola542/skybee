@@ -32,6 +32,11 @@ ErrorDocument 504 /errors/504.html
   Header always set X-Content-Type-Options "nosniff"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set X-Frame-Options "DENY"
+  Header always set Strict-Transport-Security "max-age=31536000" "expr=%{HTTPS} == 'on'"
+  # дані позицій виконавців читають застосунки з інших адрес
+  <Files "stars.json">
+    Header set Access-Control-Allow-Origin "*"
+  </Files>
   # «спершу мережа»: оболонка, service worker і дані завжди свіжі
   <FilesMatch "\.(html|js|css|json|webmanifest)$">
     Header set Cache-Control "no-cache"
