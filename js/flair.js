@@ -2,6 +2,7 @@
 // It lives in the user's own repo as one record, so any Skybee client can read it straight from their PDS;
 // other Bluesky apps simply ignore the collection.
 import { errText } from "./errors.js";
+import { t } from "./i18n.js";
 import * as api from "./api.js";
 import { esc, modal, toast, confirmBox } from "./ui.js";
 import * as saw from "./stars.js";
@@ -65,11 +66,12 @@ export function load(did) {
     if (!api.pdsOk(pds)) return null; // resolvePds already refuses such servers; the own session is checked here too
     const via = mine || api.bskyHost(pds) ? pds : SLINGSHOT;
     const r = await fetch(`${via}/xrpc/com.atproto.repo.getRecord?repo=${encodeURIComponent(did)}&collection=${NSID}&rkey=self`);
-    if (!r.ok) { if (mine && (r.status === 400 || r.status === 404)) rememberColor(did, null); return null; } // no record: this person has no Skybee look
+    if (r.status === 400 || r.status === 404) { if (mine) rememberColor(did, null); return null; } // no record: this person has no Skybee look
+    if (!r.ok) throw new Error("flair " + r.status); // a server hiccup: try again later (below), not «no look» for the whole session
     const rec = clean((await r.json()).value);
     if (mine) rememberColor(did, rec?.color);
     return rec && { rec, pds };
-  })().catch(() => null));
+  })().catch(() => { setTimeout(() => cache.delete(did), 60000); return null; })); // a network error is not remembered forever
   return cache.get(did);
 }
 
@@ -140,11 +142,15 @@ function partner(c) {
   return "#" + f(0) + f(8) + f(4);
 }
 // [c1, c2, c3] → the custom properties of the gradient (one colour gets a partner shade, two colours flow back through c1)
-const VARS = ["--sb", "--sb2", "--sb3", "--sb-ink"];
+const VARS = ["--sb", "--sb2", "--sb3", "--sb-ink", "--sb-btn"];
+const darken = (c, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(c.slice(i, i + 2), 16) * (1 - t)).toString(16).padStart(2, "0")).join("");
 function putColors(el, [c1, c2, c3], still, cls) {
   if (c2 === c1) c2 = partner(c1);
   el.style.setProperty("--sb", c1); el.style.setProperty("--sb2", c2); el.style.setProperty("--sb3", c3 || c1);
-  el.style.setProperty("--sb-ink", inkFor(c1, c2)); el.classList.add(cls); el.classList.toggle("sb-still", !!still);
+  const ink = inkFor(c1, c2);
+  el.style.setProperty("--sb-ink", ink);
+  // the text of a filled button (its fill is the ink): a white button gets a deep shade of the colour, not the bright colour itself (2.6:1)
+  el.style.setProperty("--sb-btn", ink === "#ffffff" ? darken(c1, 0.6) : c1); el.classList.add(cls); el.classList.toggle("sb-still", !!still);
 }
 const setColors = (el, c, still) => putColors(el, c, still, "sb-tint");
 export function untint(el) {
@@ -163,9 +169,21 @@ function tintPost(art) {
   load(did).then((got) => { const c = colorsOf(got?.rec); if (c && art.isConnected) putColors(art, c, got.rec.flow === false, "sb-post"); });
 }
 if (typeof MutationObserver !== "undefined") {
-  let queued = false;
-  const scan = () => { queued = false; if (!postColorsOn() || !api.session) return; document.querySelectorAll("article.post[data-uri]:not([data-sbp])").forEach(tintPost); };
-  new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(scan); } }).observe(document.documentElement, { childList: true, subtree: true });
+  // only the nodes that just arrived are looked at (the whole page grew with every scroll: quadratic over a long feed)
+  let queued = false, fresh = [];
+  const scan = () => {
+    queued = false; const nodes = fresh; fresh = [];
+    if (!postColorsOn() || !api.session) return;
+    for (const n of nodes) {
+      if (!n.isConnected) continue;
+      if (n.matches("article.post[data-uri]:not([data-sbp])")) tintPost(n);
+      n.querySelectorAll("article.post[data-uri]:not([data-sbp])").forEach(tintPost);
+    }
+  };
+  new MutationObserver((list) => {
+    for (const m of list) for (const n of m.addedNodes) if (n.nodeType === 1) fresh.push(n);
+    if (fresh.length && !queued) { queued = true; requestAnimationFrame(scan); }
+  }).observe(document.documentElement, { childList: true, subtree: true });
 }
 
 // Called right after the profile header is rendered; fills in the extras when they arrive
@@ -182,7 +200,7 @@ export async function decorate(el, p) {
     banner.style.backgroundImage = `linear-gradient(125deg, ${cs[0]}, ${cs[1]}, ${cs[2] || cs[0]}, ${cs[1]}, ${cs[0]})`;
     banner.classList.add("sb-flow"); banner.classList.toggle("sb-still", rec.flow === false);
   }
-  if (rec.status) head.querySelector(".bigava")?.insertAdjacentHTML("beforeend", `<div class="sb-bubble" title="Статус у Skybee">${esc(rec.status)}</div>`);
+  if (rec.status) head.querySelector(".bigava")?.insertAdjacentHTML("beforeend", `<div class="sb-bubble" title="${esc(t("Статус у Skybee"))}">${esc(rec.status)}</div>`);
   if (rec.music) {
     // under the track: «Підтримує війну? ⬇️» — opens the positions of its artists, a short text and the source
     (head.querySelector(".bio") || head.querySelector(".counts"))?.insertAdjacentHTML("afterend", trackCard(rec.music)

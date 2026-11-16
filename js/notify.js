@@ -46,10 +46,11 @@ export async function show(title, body, hash, tag) {
   } catch { /* not allowed here */ }
 }
 
-let lastCount = -1;
+let lastCount = -1, lastDid = "";
 // Called after every badge poll: `count` of unread notifications and the chat list (null when chats are unavailable)
 export async function check(count, convos) {
-  if (!enabled()) return;
+  if (!enabled() || !api.session) return;
+  if (api.session.did !== lastDid) { lastDid = api.session.did; lastCount = -1; } // another account: its count starts afresh
   const me = api.session.did, now = new Date().toISOString(), who = (a) => a?.displayName || a?.handle || "Хтось";
   let mark = {};
   try { mark = JSON.parse(getItem(markKey())) || {}; } catch {}

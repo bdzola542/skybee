@@ -15,6 +15,17 @@ export const APP_COLORS = [["#ff4d4d", "Червоний"], ["#ff7a2e", "Пом�
   ["#36b86a", "Зелений"], ["#4ff0f0", "Бірюзовий"], ["#4a8cff", "Синій"], ["#7a8cff", "Волошковий"], ["#a06bff", "Бузковий"], ["#ff3df5", "Пурпуровий"],
   ["#ff8aa0", "Рожевий"], ["#d2b48c", "Пісочний"], ["#ffffff", "Білий"], ["#a8a8a8", "Сірий"], ["#6e6e6e", "Графітовий"]];
 const isHex = (c) => typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c);
+// WCAG contrast of two #rrggbb colours
+const relLum = (h) => { const v = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(x => x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+const contrast = (a, b) => { const [x, y] = [relLum(a), relLum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+const mixHex = (a, b, t) => "#" + [1, 3, 5].map(i => Math.round(parseInt(a.slice(i, i + 2), 16) * (1 - t) + parseInt(b.slice(i, i + 2), 16) * t).toString(16).padStart(2, "0")).join("");
+// an app colour too close to the page (#111 on the dark theme, pale yellow on the light one) is lightened or darkened
+// just enough for buttons, the current tab and the counters to stay visible (3:1, WCAG for interface parts)
+function visibleAccent(c, theme) {
+  const bg = { light: "#ffffff", dim: "#161e27" }[theme] || "#0f1218", to = theme === "light" ? "#000000" : "#ffffff";
+  for (let t = 0; t <= 1; t += 0.05) { const m = mixHex(c, to, t); if (contrast(m, bg) >= 3) return m; }
+  return to;
+}
 import * as flair from "./flair.js";
 import { statusBarFor, isNative } from "./native.js";
 import * as upd from "./updates.js";
@@ -37,8 +48,9 @@ export function appColor() {
 }
 const saved = (promise, undo) => promise.then(() => toast("Збережено"), (ex) => { toast(errText(ex), 5000); undo?.(); });
 // the server refuses some account actions to an app password: say what to do instead of a bare error
-const needMain = (ex) => ex.status === 401 || ex.status === 403 || /token|scope|privileged|Bad token/i.test(ex.message)
-  ? "Ця дія потребує входу з основним паролем. Вийди й увійди знову, обравши «Основний пароль»." : errText(ex);
+// an app password is refused here: the hint, plus the real cause in brackets (it may also be an expired session or a limit)
+const needMain = (ex) => ((ex.status === 401 || ex.status === 403) && !/RateLimit|Expired|Takedown/i.test(ex.code || "")) || /Bad token scope|privileged/i.test(ex.message || "")
+  ? `Ця дія потребує входу з основним паролем. Вийди й увійди знову, обравши «Основний пароль». ${errText(ex)}` : errText(ex);
 
 /* ---------- section icons: the same line set as the main menu (ico in ui.js) ---------- */
 const IC = new Proxy({ chev: `<svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>` }, { get: (o, k) => o[k] ?? ico(k) });
@@ -473,7 +485,7 @@ export function applyLook() {
   // app colour: the palette of the profile colour (js/flair.js); it replaces the gold accent (buttons, switches, the current tab)
   const ok = isHex(c);
   root.classList.toggle("sb-theme", ok);
-  if (ok) { root.style.setProperty("--sb", c); root.style.setProperty("--sb-ink", inkFor(c)); }
+  if (ok) { const a = visibleAccent(c, root.dataset.theme); root.style.setProperty("--sb", a); root.style.setProperty("--sb-ink", inkFor(a)); }
   else { root.style.removeProperty("--sb"); root.style.removeProperty("--sb-ink"); }
   root.style.colorScheme = ""; // the colour only changes the accent now, the page keeps its theme
   // interface style: Liquid Glass (iPhone by default) or Material Design (Android by default), each with its own options
@@ -571,10 +583,15 @@ export async function a11y(el) {
       ${toggle("calm", "Зменшити анімацію", store.get("skybee.calm") === "1", "Без плавних переходів і анімацій")}
       ${toggle("noautogif", "Не відтворювати GIF самостійно", store.get("skybee.autogif") !== "1")}
     </div>
+    <div class="card">
+      <h3>Клавіатура</h3>
+      ${toggle("hotkeys", "Гарячі клавіші з однієї літери", store.get("skybee.hotkeys") !== "0", "n — новий пост, j/k — між постами, l — вподобати, 1–5 — розділи. Вимкни, якщо користуєшся голосовим керуванням чи екранною клавіатурою")}
+    </div>
     <div class="sgroup">${row("#/settings/appearance", "brush", "Розмір тексту й тема")}</div>`;
   $("#reqalt", el).onchange = (e) => { store.set("skybee.requireAlt", e.target.checked ? "1" : null); toast("Збережено"); };
   $("#calm", el).onchange = (e) => { store.set("skybee.calm", e.target.checked ? "1" : null); applyLook(); toast("Збережено"); };
   $("#noautogif", el).onchange = (e) => { store.set("skybee.autogif", e.target.checked ? null : "1"); toast("Збережено"); };
+  $("#hotkeys", el).onchange = (e) => { store.set("skybee.hotkeys", e.target.checked ? null : "0"); toast("Збережено"); };
 }
 
 /* ================= LANGUAGES ================= */

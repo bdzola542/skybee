@@ -1,10 +1,11 @@
+import { fileURLToPath } from "node:url";
 // Collects every piece of interface text (Ukrainian) from js/*.js and index.html into i18n/keys.json —
 // the list a translator works from. Usage: node scripts/i18n-extract.mjs
 // A piece = one text node or one title/placeholder/aria-label as the page shows it; ${…} inside it becomes {0}, {1}…
 // (js/i18n.js matches those against the page with the same numbering).
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from "node:fs";
 
-const root = new URL("..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("..", import.meta.url)); // not .pathname: on Windows that gives «/C:/…»
 const CYR = /[А-ЯЁЇІЄҐа-яїієґ]/;
 const ATTRS = /\b(title|placeholder|aria-label|data-tip|label)\s*=\s*$/i;
 const keys = new Map(); // key → first place seen

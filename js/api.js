@@ -61,7 +61,10 @@ export async function resolvePds(input) {
   const docUrl = did.startsWith("did:plc:")
     ? `https://plc.directory/${did}`
     : `https://${did.slice("did:web:".length)}/.well-known/did.json`;
-  const doc = await (await fetch(docUrl)).json();
+  const dr = await fetch(docUrl);
+  if (!dr.ok) { const e = new Error("Не вдалося прочитати дані акаунта (DID)"); e.status = dr.status; throw e; }
+  const doc = await dr.json().catch(() => null);
+  if (!doc) throw new Error("Не вдалося прочитати дані акаунта (DID)");
   const pds = pdsOfDoc(doc);
   if (!pds) throw new Error("Не знайдено сервер (PDS) акаунта");
   return { did, pds };
@@ -72,9 +75,12 @@ export async function resolvePds(input) {
 // knock on their router), and nothing but https (passwords and tokens never go over plain http).
 export function pdsOk(u) {
   let x; try { x = new URL(u); } catch { return false; }
-  const h = x.hostname.toLowerCase();
+  const h = x.hostname.toLowerCase().replace(/\.$/, ""); // «localhost.» (a trailing dot) is the same host as «localhost»
   return x.protocol === "https:" && !x.username && !x.password && h.includes(".") && !/^[\d.]+$/.test(h) && !h.startsWith("[")
-    && !/(^|\.)(localhost|local|internal|lan|home|intranet|corp|localdomain|home\.arpa)$/.test(h);
+    && !/(^|\.)(localhost|local|internal|lan|home|intranet|corp|localdomain|home\.arpa)$/.test(h)
+    // wildcard DNS that turns any name into an address of choice (127.0.0.1.nip.io → 127.0.0.1): the user's own machine or network
+    && !/(^|\.)(nip\.io|sslip\.io|xip\.io|traefik\.me|localtest\.me|lvh\.me|vcap\.me)$/.test(h)
+    && !/(^|[.-])(127|10|0)([.-]\d{1,3}){3}([.-]|$)|(^|[.-])192[.-]168[.-]|(^|[.-])169[.-]254[.-]|(^|[.-])172[.-](1[6-9]|2\d|3[01])[.-]/.test(h);
 }
 // Servers run by Bluesky itself: logging in there needs no extra question
 export const bskyHost = (u) => { try { const h = new URL(u).hostname; return h === "bsky.social" || h.endsWith(".bsky.network"); } catch { return false; } };
@@ -170,6 +176,14 @@ async function refresh(s) {
   saveSession();
 }
 
+// several requests can hit an expired token at once; refresh tokens rotate, so only one refresh per account may run
+const refreshing = new Map();
+function refreshOnce(s) {
+  let p = refreshing.get(s.did);
+  if (!p) { p = refresh(s).finally(() => refreshing.delete(s.did)); refreshing.set(s.did, p); }
+  return p;
+}
+
 /* ---------- XRPC ---------- */
 // opts: { params, body, raw (Blob), contentType, proxy, retry }
 export async function xrpc(method, opts = {}) {
@@ -183,18 +197,23 @@ export async function xrpc(method, opts = {}) {
     else url.searchParams.set(k, v);
   }
   const headers = { ...extra };
-  if (s) headers.Authorization = `Bearer ${s.accessJwt}`;
+  const sentJwt = s?.accessJwt;
+  if (s) headers.Authorization = `Bearer ${sentJwt}`;
   // the moderation services the user subscribed to: the app view then returns their labels too
   if (s && !proxy && method.startsWith("app.bsky.") && labelerDids.length) headers["atproto-accept-labelers"] = [BSKY_MOD + ";redact", ...labelerDids].join(", ");
   if (proxy) headers["atproto-proxy"] = proxy;
   let payload;
   if (raw) { payload = raw; headers["Content-Type"] = contentType || raw.type || "application/octet-stream"; }
   else if (body) { payload = JSON.stringify(body); headers["Content-Type"] = "application/json"; }
-  const r = await fetch(url, { method: payload || verb === "POST" ? "POST" : "GET", headers, body: payload });
-  const data = r.headers.get("content-type")?.includes("json") ? await r.json() : null;
+  // a request that hangs gives up after 30 s (uploads excepted): otherwise one stuck call stopped the counters and the chat for good
+  const signal = raw ? undefined : AbortSignal.timeout?.(30000);
+  const r = await fetch(url, { method: payload || verb === "POST" ? "POST" : "GET", headers, body: payload, signal });
+  const data = r.headers.get("content-type")?.includes("json") ? await r.json().catch(() => null) : null;
   if (!r.ok) {
     if (s && retry && (data?.error === "ExpiredToken" || data?.error === "InvalidToken")) {
-      await refresh(s); return xrpc(method, { ...opts, retry: false, as: s });
+      // another request may have refreshed the token meanwhile: then just repeat with the new one
+      if (s.accessJwt === sentJwt) await refreshOnce(s);
+      return xrpc(method, { ...opts, retry: false, as: s });
     }
     const e = new Error(data?.message || data?.error || `Помилка ${r.status}`);
     e.code = data?.error; e.status = r.status;
@@ -312,7 +331,6 @@ export const detachQuote = (postUri, quoteUri) => editPostgate(postUri, g => ({ 
 /* ---------- lists ---------- */
 const LIST = "app.bsky.graph.list", LISTITEM = "app.bsky.graph.listitem";
 export const CURATE = "app.bsky.graph.defs#curatelist", MODLIST = "app.bsky.graph.defs#modlist";
-export const createList = (name, description, purpose = CURATE) => createRecord(LIST, { name, description: description || undefined, purpose });
 export async function updateList(uri, patch) {
   const cur = (await get("com.atproto.repo.getRecord", { repo: session.did, collection: LIST, rkey: rkeyOf(uri) })).value;
   await post("com.atproto.repo.putRecord", { repo: session.did, collection: LIST, rkey: rkeyOf(uri), record: { ...cur, ...patch } });
@@ -617,7 +635,7 @@ async function putPrefs(prefs) {
 // Resolves when preferences (and so muted words) are known, or after a short wait; never rejects
 export let prefsReady = Promise.resolve();
 export function primePrefs() {
-  prefsReady = Promise.race([getPrefs().then(() => loadLabelers()).catch(() => {}), new Promise(res => setTimeout(res, 3000))]);
+  prefsReady = Promise.race([getPrefs().then(() => loadLabelers().catch(retryLabelers)).catch(() => {}), new Promise(res => setTimeout(res, 3000))]);
 }
 
 /* ---------- moderation services (labelers) ---------- */
@@ -627,6 +645,11 @@ export let labelerDids = [];
 const labelDefs = new Map(); // "did|value" → definition (identifier, severity, blurs, defaultSetting, adultOnly, locales)
 export const labelerViews = new Map(); // did → app.bsky.labeler.defs#labelerViewDetailed
 const labelersOf = (prefs) => (lastPref(prefs, "labelersPref")?.labelers || []).map(l => l.did).filter(d => d && d !== BSKY_MOD);
+// without the services' own label definitions every label falls back to «warn»: keep trying quietly in the background
+function retryLabelers(e, wait = 30000) {
+  console.warn("Skybee: moderation services did not load", e?.code || e?.status || e);
+  if (wait <= 600000) setTimeout(() => loadLabelers().catch(x => retryLabelers(x, wait * 2)), wait);
+}
 export async function loadLabelers(dids) {
   labelerDids = labelersOf(prefsCache || []);
   const want = (dids || labelerDids).filter(d => d !== BSKY_MOD);

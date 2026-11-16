@@ -111,12 +111,16 @@ ipcMain.handle("skybee:beta", (_e, on) => {
   return { on: betaOn(), available: !!updater };
 });
 function askRestart(version) {
-  dialog.showMessageBox(win, {
+  const opts = {
     type: "info", title: "Оновлення Skybee", noLink: true, defaultId: 0, cancelId: 1,
     message: `Завантажено нову версію Skybee ${version}`,
     detail: "Перезапустити й оновити зараз? Якщо відкласти, оновлення встановиться саме, коли закриєш Skybee.",
     buttons: ["Оновити зараз", "Пізніше"],
-  }).then(({ response }) => { if (response === 0) setImmediate(() => updater.quitAndInstall(true, true)); }); // silently, then start Skybee again
+  };
+  // the window may be closed to the tray (or gone): then the question is a window of its own
+  (win && !win.isDestroyed() ? dialog.showMessageBox(win, opts) : dialog.showMessageBox(opts))
+    .then(({ response }) => { if (response === 0) setImmediate(() => updater.quitAndInstall(true, true)); }) // silently, then start Skybee again
+    .catch(e => console.error("update dialog", e));
 }
 function setupShellUpdates() {
   if (!app.isPackaged) return;
@@ -135,19 +139,22 @@ function setupShellUpdates() {
     downloaded = info.version;
     if (!asked) { asked = true; askRestart(info.version); }
   });
-  const check = () => updater.checkForUpdates().catch(() => {});
+  const check = () => { if (!checking) checkOnce().catch(() => {}); };
   setTimeout(check, 8000);
   setInterval(check, 6 * 3600e3);
 }
 
 /* «Перевірити оновлення» (Settings → Про Skybee, and the tray menu). Result:
    { state: "latest" | "downloading" | "ready" | "flatpak" | "manual" | "dev" | "error", version, code? } */
+// the timer and «Перевірити оновлення» share one check at a time
+let checking = null;
+function checkOnce() { return checking ||= updater.checkForUpdates().finally(() => { checking = null; }); }
 async function checkUpdatesNow() {
   const current = app.getVersion();
   if (!updater) return { state: process.env.FLATPAK_ID ? "flatpak" : app.isPackaged ? "manual" : "dev", version: current };
   if (downloaded) { askRestart(downloaded); return { state: "ready", version: downloaded }; }
   try {
-    const r = await updater.checkForUpdates();
+    const r = await checkOnce();
     if (!r?.isUpdateAvailable) return { state: "latest", version: current };
     return { state: "downloading", version: r.updateInfo.version }; // autoDownload: the restart question comes when it is done
   } catch (e) {
@@ -194,7 +201,7 @@ function setupTray() {
         dev: ["Skybee запущено з вихідного коду — оновлення вимкнені.", ""],
         error: ["Не вдалося перевірити оновлення.", `Перевір підключення до інтернету й спробуй ще раз пізніше. (${r.code})`],
       }[r.state];
-      dialog.showMessageBox({ type: r.state === "error" ? "warning" : "info", title: "Оновлення Skybee", message: text[0], detail: text[1], buttons: ["OK"], noLink: true });
+      dialog.showMessageBox({ type: r.state === "error" ? "warning" : "info", title: "Оновлення Skybee", message: text[0], detail: text[1], buttons: ["OK"], noLink: true }).catch(() => {});
     } },
     { type: "separator" },
     { label: "Вийти", click: () => { quitting = true; app.quit(); } },
@@ -284,7 +291,9 @@ else {
   app.whenReady().then(() => {
     const root = pickWebRoot();
     protocol.handle("app", async (req) => {
-      const rel = decodeURIComponent(new URL(req.url).pathname).replace(/^\/$/, "/index.html");
+      let rel;
+      try { rel = decodeURIComponent(new URL(req.url).pathname).replace(/^\/$/, "/index.html"); }
+      catch { return new Response("", { status: 400 }); } // «%E0%A4%A» and alike: a bad address, not a crash of the handler
       for (const base of root === BUNDLED ? [BUNDLED] : [root, BUNDLED]) { // what the download lacks comes from the bundle
         const file = path.join(base, rel);
         if (!file.startsWith(base + path.sep)) return new Response("", { status: 403 });

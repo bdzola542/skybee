@@ -75,13 +75,14 @@ function homeFilter(d) {
   return d;
 }
 // The home screen's feeds: pinned feeds and lists, then own feeds pinned in Skybee. Shared with the right column
-let tabsCache = null, tabsAt = 0;
+let tabsCache = null, tabsAt = 0, tabsWarned = false;
 export function homeTabs() {
   if (tabsCache && Date.now() - tabsAt < 60000) return tabsCache;
   const stale = tabsCache; // an older list is shown at once (the home screen must not wait for the network); a fresh one is fetched behind it
   tabsAt = Date.now();
   const fresh = tabsCache = (async () => {
   const tabs = [{ label: "Підписки", kind: "timeline" }];
+  let tabsFailed = null;
   try {
     const saved = (await api.getSavedFeeds()).filter(i => i.pinned && i.type !== "timeline");
     const feedUris = saved.filter(i => i.type === "feed").map(i => i.value);
@@ -92,13 +93,14 @@ export function homeTabs() {
         try { const l = (await api.get("app.bsky.graph.getList", { list: i.value, limit: 1 })).list; tabs.push({ label: l.name, kind: "list", uri: l.uri }); } catch {}
       }
     }
-  } catch {}
+  } catch (e) { tabsFailed = e; console.warn("Skybee: pinned feeds", e?.code || e); }
+  if (tabsFailed && !tabsWarned) { tabsWarned = true; toast(T("Не вдалося завантажити закріплені фіди — показано стандартні ({0})", errText(tabsFailed)), 5000); }
   if (tabs.length === 1) { // nothing pinned yet: the default feeds, in their set order
     try {
       const gens = (await api.get("app.bsky.feed.getFeedGenerators", { feeds: api.DEFAULT_FEEDS })).feeds;
       for (const uri of api.DEFAULT_FEEDS) { const g = gens.find(g => g.uri === uri); if (g) tabs.push({ label: g.displayName, kind: "feed", uri }); }
     } catch {}
-    if (tabs.length === 1) tabs.push({ label: "Discover", kind: "feed", uri: api.DISCOVER });
+    if (tabs.length === 1) tabs.push({ label: "Discover", kind: "feed", uri: api.DISCOVER }); // the feed's own name, as elsewhere in the app
   }
   // own feeds built in Skybee, pinned to the home screen
   try { for (const f of await src.myFeeds()) if (f.pinned) tabs.push({ label: f.name, kind: "my", uri: f.id }); } catch {}
@@ -308,7 +310,7 @@ export async function thread(el, { actor, rkey, read = false }) {
   const readBtn = chain ? `<a class="ghost sm" href="${location.hash.split("?")[0]}?read" title="Лише пости автора гілки, одним текстом">📖 Читати</a>` : "";
   el.innerHTML = header("Пост", true, readBtn) + parents.join("") + renderPost(t.post, { focus: true }) + gate +
     (noReply ? "" : !session ? `<a class="replybox" href="#/login"><span class="muted">Увійди, щоб відповісти…</span></a>`
-      : `<div class="replybox" data-act="reply" data-uri="${esc(t.post.uri)}">${avatar(actors.get(session.did) || {}, 32)}<span class="muted">Напиши відповідь…</span></div>`) +
+      : `<div class="replybox" data-act="reply" role="button" tabindex="0" data-uri="${esc(t.post.uri)}">${avatar(actors.get(session.did) || {}, 32)}<span class="muted">Напиши відповідь…</span></div>`) +
     (replies(t) || empty("Відповідей ще немає")) +
     (hidden.length ? `<details class="hidden-replies"><summary class="muted pad">Приховані відповіді: ${hidden.length}</summary>${hidden.map(p => renderPost(p, { thread: true })).join("")}</details>` : "");
   el.querySelector(".post.focus")?.scrollIntoView({ block: "start" });
@@ -330,7 +332,7 @@ async function reader(el, uri) {
   const a = top.author, open = location.hash.split("?")[0];
   el.innerHTML = header("Читання", true, `<a class="ghost sm" href="${open}" title="Звичайний вигляд з відповідями">💬 Гілка</a>`) + `
     <article class="reader">
-      <div class="row"><a href="${profileHref(a)}">${avatar(a, 44)}</a><div class="who"><a href="${profileHref(a)}"><b>${vname(a)}</b></a><span class="muted small">${at(a.handle)} · ${new Date(top.record?.createdAt || top.indexedAt).toLocaleDateString(LOC, { dateStyle: "long" })} · ${chain.length} ${chain.length === 1 ? "пост" : chain.length < 5 ? "пости" : "постів"}</span></div></div>
+      <div class="row"><a href="${profileHref(a)}">${avatar(a, 44)}</a><div class="who"><a href="${profileHref(a)}"><b>${vname(a)}</b></a><span class="muted small">${at(a.handle)} · ${new Date(top.record?.createdAt || top.indexedAt).toLocaleDateString(LOC, { dateStyle: "long" })} · ${chain.length} ${plural(chain.length, "пост", "пости", "постів")}</span></div></div>
       ${chain.map((p, i) => `<section data-uri="${esc(p.uri)}"><div class="text">${richText(p.record?.text, p.record?.facets)}</div>${renderEmbed(p.embed, warnLabel(p))}
         <a class="muted small rnum" href="${postHref(p)}">${i + 1}/${chain.length}</a></section>`).join("")}
     </article>`;
@@ -367,7 +369,7 @@ export async function profile(el, { actor, tab = "posts" }) {
     <div class="banner" ${p.banner ? `style="background-image:url('${esc(p.banner)}')"` : ""}></div>
     <div class="phead">
       <div class="row between">
-        <div class="bigava" ${p.avatar ? `data-act="lightboxOne" data-full="${esc(p.avatar)}"` : ""}>${avatar(p, 88)}</div>
+        <div class="bigava" ${p.avatar ? `data-act="lightboxOne" role="button" tabindex="0" aria-label="Відкрити аватарку" data-full="${esc(p.avatar)}"` : ""}>${avatar(p, 88)}</div>
         <div class="row">
           ${me ? `<button class="ghost sm" data-act="editFlair" title="Статус, музика, колір та іграшка — для користувачів Skybee">✨ Оформлення</button><button class="ghost sm" data-act="editProfile">Редагувати профіль</button>`
                : `${!blocked && p.associated?.chat?.allowIncoming !== "none" ? `<button class="ghost sm icon" data-act="dm" data-did="${p.did}" title="Написати">✉️</button>` : ""}${followBtn(p)}`}
@@ -533,7 +535,7 @@ document.addEventListener("click", (e) => {
 });
 export async function notifications(el, { filter = "" }) {
   if (!NFILTERS.some(f => f[0] === filter)) filter = "";
-  el.innerHTML = header("Сповіщення", false, `<button class="ghost sm" data-act="markRead">Позначити прочитаним</button>`) +
+  el.innerHTML = header("Сповіщення", false, `<button class="ghost sm" data-act="markRead" title="Позначити прочитаним" aria-label="Позначити прочитаним">✓<span class="wide-only"> Позначити прочитаним</span></button>`) +
     `<div class="nchips">${NFILTERS.map(([k, l]) => `<a class="nchip${k === filter ? " on" : ""}" href="#/notifications${k ? "/" + k : ""}">${l}</a>`).join("")}</div>`;
   el.querySelector(".nchip.on")?.scrollIntoView({ inline: "center", block: "nearest" });
   const swipeOff = new AbortController();
@@ -820,10 +822,10 @@ export async function feeds(el) {
       if (i.type === "feed") { const g = gens.find(g => g.uri === i.value); if (!g) continue; title = g.displayName; ava = g.avatar; href = `#/feed/${enc(g.uri)}`; }
       else { try { const l = (await api.get("app.bsky.graph.getList", { list: i.value, limit: 1 })).list; title = l.name; ava = l.avatar; href = `#/list/${enc(l.uri)}`; } catch { continue; } }
       rows.push(`<div class="actor" data-href="${href}">${avatar({ avatar: ava, displayName: title }, 36)}<div class="who"><b>${esc(title)}</b><span class="muted small">${i.type === "list" ? "Список" : "Фід"}</span></div>
-        <button class="ghost sm" data-act="moveFeed" data-dir="-1" data-uri="${esc(i.value)}" title="Вище">↑</button>
+        <div class="fbtns"><button class="ghost sm" data-act="moveFeed" data-dir="-1" data-uri="${esc(i.value)}" title="Вище">↑</button>
         <button class="ghost sm" data-act="moveFeed" data-dir="1" data-uri="${esc(i.value)}" title="Нижче">↓</button>
         <button class="ghost sm" data-act="pinFeed" data-uri="${esc(i.value)}" title="${i.pinned ? "Відкріпити з головної" : "Закріпити на головній"}">${i.pinned ? "📌" : "📍"}</button>
-        <button class="ghost sm" data-act="unsaveFeed" data-uri="${esc(i.value)}" title="Видалити">✕</button></div>`);
+        <button class="ghost sm" data-act="unsaveFeed" data-uri="${esc(i.value)}" title="Видалити">✕</button></div></div>`);
     }
     mine.innerHTML = rows.join("") || empty("Збережених фідів немає");
   };
@@ -1006,6 +1008,7 @@ export async function convo(el, { id }) {
       </div></div>`;
     const close = () => { leave(wrap); document.removeEventListener("keydown", onKey); };
     const onKey = (e) => { if (e.key === "Escape") close(); };
+    wrap.close = close; // navigation closes it like the other windows (its key listener goes with it)
     document.addEventListener("keydown", onKey);
     wrap.addEventListener("click", async (e) => {
       if (e.target === wrap) return close();
@@ -1084,16 +1087,23 @@ export async function convo(el, { id }) {
       render([m]); scrollTo(0, document.body.scrollHeight);
     } catch (ex) { toast(errText(ex)); ta.value = typed; setReply(was); }
   };
+  // every 5 s while the chat is on screen: not in a hidden tab, never two rounds at once,
+  // and after a few failed rounds in a row the user is told (it used to just stop updating silently)
+  let busy = false, fails = 0;
   const poll = setInterval(async () => {
-    try {
-      const d = await api.chat("chat.bsky.convo.getMessages", { convoId: id, limit: 20 });
-      const fresh = d.messages.reverse().filter(m => !seen.has(m.id));
-      if (fresh.length) {
-        const atBottom = innerHeight + scrollY >= document.body.scrollHeight - 80;
-        render(fresh); if (atBottom) scrollTo(0, document.body.scrollHeight);
-        api.chatPost("chat.bsky.convo.updateRead", { convoId: id }).catch(() => {});
-      }
-    } catch {}
+    if (busy || document.hidden) return;
+    busy = true;
+    let d = null;
+    try { d = await api.chat("chat.bsky.convo.getMessages", { convoId: id, limit: 20 }); fails = 0; }
+    catch (ex) { if (++fails === 3) toast(T("Немає зв'язку з чатом, повторюю… ({0})", errText(ex))); }
+    busy = false;
+    if (!d || !el.isConnected) return;
+    const fresh = d.messages.reverse().filter(m => !seen.has(m.id));
+    if (fresh.length) {
+      const atBottom = innerHeight + scrollY >= document.body.scrollHeight - 80;
+      render(fresh); if (atBottom) scrollTo(0, document.body.scrollHeight);
+      api.chatPost("chat.bsky.convo.updateRead", { convoId: id }).catch(e => console.warn("Skybee: mark read", e?.code || e));
+    }
   }, 5000);
   return () => { clearInterval(poll); stopOlder(); };
 }

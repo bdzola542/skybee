@@ -2,20 +2,37 @@
 <html lang="uk" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f1218">
-<meta name="description" content="Skybee — відкритий клієнт для Bluesky">
+<meta name="description" content="Skybee — безкоштовний відкритий клієнт для Bluesky українською: колонки, власні стрічки, чати, теми Liquid Glass і Material. Вебверсія, Windows, Linux, Android та iPhone.">
+<link rel="canonical" href="https://skybee.online/">
+<!-- a link to the site shared in Telegram, Discord, Bluesky, X: the title, the text and the picture -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Skybee">
+<meta property="og:title" content="Skybee — відкритий клієнт Bluesky: колонки, власні стрічки, теми">
+<meta property="og:description" content="Skybee — безкоштовний відкритий клієнт для Bluesky українською: колонки, власні стрічки, чати, теми Liquid Glass і Material. Вебверсія, Windows, Linux, Android та iPhone.">
+<meta property="og:url" content="https://skybee.online/">
+<meta property="og:image" content="https://skybee.online/icons/icon-512.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:image:alt" content="Бджілка Skybee">
+<meta property="og:locale" content="uk_UA">
+<meta name="twitter:card" content="summary">
+<meta name="application-name" content="Skybee">
+<!-- data for search engines; not a script, so the CSP does not run it -->
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebSite", "name": "Skybee", "url": "https://skybee.online/", "inLanguage": "uk"}, {"@type": "SoftwareApplication", "name": "Skybee", "url": "https://skybee.online/", "applicationCategory": "SocialNetworkingApplication", "operatingSystem": "Web, Windows, Linux, Android, iOS", "isAccessibleForFree": true, "inLanguage": "uk", "description": "Skybee — безкоштовний відкритий клієнт для Bluesky українською: колонки, власні стрічки, чати, теми Liquid Glass і Material. Вебверсія, Windows, Linux, Android та iPhone.", "image": "https://skybee.online/icons/icon-512.png", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "UAH"}, "codeRepository": "https://github.com/vysocavnu/skybee"}]}</script>
 <!-- Захист від чужих скриптів: навіть якщо десь у рендері знайдеться дірка, вставлений код не виконається.
      Скрипти — лише власні (hls.js — копія в js/vendor/). На телефонах (mobile/www) політику вмикає
      js/native.js одразу після старту (scripts/dist.mjs): Capacitor на Android спершу вставляє свій міст вбудованим скриптом. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' app:; style-src 'self' app: 'unsafe-inline'; img-src 'self' app: https: data: blob:; media-src 'self' app: https: blob:; connect-src 'self' app: https:; font-src 'self' app: data:; worker-src 'self' blob:; manifest-src 'self' app:; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://player.twitch.tv https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com; object-src 'none'; base-uri 'self'; form-action 'self'">
-<title>Skybee — клієнт Bluesky</title>
+<title>Skybee — відкритий клієнт Bluesky: колонки, власні стрічки, теми</title>
 <link rel="icon" href="icons/favicon.svg?v=2" type="image/svg+xml">
 <link rel="icon" href="favicon.ico?v=2" sizes="16x16 32x32">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Skybee">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -26,7 +43,20 @@
   <feDisplacementMap in="SourceGraphic" in2="map" scale="0.06" xChannelSelector="R" yChannelSelector="G"/>
 </filter></svg>
 <div id="app"><div class="sentinel"><div class="spinner"></div></div></div>
-<noscript>Skybee потребує JavaScript.</noscript>
+<noscript><main class="pad">
+  <h1>Skybee — відкритий клієнт для Bluesky</h1>
+  <p>Безкоштовний клієнт соцмережі Bluesky українською: колонки поруч, власні стрічки без сервера, чати, сповіщення, теми Liquid Glass і Material, оформлення профілю.</p>
+  <p>Працює у браузері, а також як застосунок для Windows, Linux, Android та iPhone — <a href="https://github.com/vysocavnu/skybee/releases">завантажити</a>.</p>
+  <p>Для роботи Skybee потрібен JavaScript.</p>
+</main></noscript>
+<link rel="modulepreload" href="js/i18n.js">
+<link rel="modulepreload" href="js/errors.js">
+<link rel="modulepreload" href="js/api.js">
+<link rel="modulepreload" href="js/ui.js">
+<link rel="modulepreload" href="js/views.js">
+<link rel="modulepreload" href="js/settings.js">
+<link rel="modulepreload" href="js/more.js">
+<link rel="modulepreload" href="js/flair.js">
 <script type="module" src="js/app.js"></script>
 </body>
 </html>

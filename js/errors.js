@@ -58,7 +58,9 @@ export function errText(e) {
   if (BY_CODE[code]) return withCode(BY_CODE[code]);
   if (msg && ukrainian(msg) && !/^Помилка \d+$/.test(msg)) return withCode(msg); // our own explanations are already in Ukrainian
   const base = BY_STATUS[status] || (status >= 500 ? "Сервер тимчасово не працює" : status ? "Сервер повернув помилку" : "");
-  if (base && msg && !/^Помилка \d+$/.test(msg) && msg !== code) return withCode(`${base}: ${msg}`);
-  if (base) return withCode(base);
-  return withCode(msg || "Щось пішло не так");
+  // the server's own words are English: they go into the brackets as a technical detail, the sentence stays Ukrainian
+  const detail = msg && !/^Помилка \d+$/.test(msg) && msg !== code ? msg.slice(0, 160) : "";
+  const withAll = (t) => { const x = [tail, detail && `«${detail}»`].filter(Boolean).join("; "); return x ? `${t} (код: ${x})` : t; };
+  if (base) return withAll(base);
+  return withAll("Щось пішло не так");
 }

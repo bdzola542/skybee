@@ -1,5 +1,5 @@
 // Skybee — rendering helpers
-import { locale as LOC } from "./i18n.js";
+import { locale as LOC, t as T } from "./i18n.js";
 import { errText } from "./errors.js";
 import { session, mutedWords, adultEnabled, labelPref, labelDef, labelName, labelerPref, labelerDids } from "./api.js";
 
@@ -309,7 +309,7 @@ export function renderEmbed(embed, label) {
   if (t === "app.bsky.embed.images#view") {
     const imgs = embed.images;
     return blurWrap(`<div class="imgs n${imgs.length}">${imgs.map((i, n) =>
-      `<img src="${esc(i.thumb)}" data-full="${esc(i.fullsize)}" data-act="lightbox" data-i="${n}" alt="${esc(i.alt)}" title="${esc(i.alt)}" loading="lazy">`).join("")}</div>`, label);
+      `<img src="${esc(i.thumb)}" data-full="${esc(i.fullsize)}" data-act="lightbox" data-i="${n}" alt="${esc(i.alt)}" role="button" tabindex="0" aria-label="${esc(i.alt ? T("Відкрити фото: {0}", i.alt) : T("Відкрити фото"))}" loading="lazy">`).join("")}</div>`, label);
   }
   if (t === "app.bsky.embed.video#view") {
     const ar = embed.aspectRatio ? `aspect-ratio:${embed.aspectRatio.width}/${embed.aspectRatio.height}` : "aspect-ratio:16/9";
@@ -358,7 +358,7 @@ function renderRecord(r) {
     const label = warnLabel(fake);
     const media = (r.embeds || []).map(e => e.$type === "app.bsky.embed.record#view" || e.$type === "app.bsky.embed.recordWithMedia#view"
       ? renderEmbed(e.media ? { ...e.media } : null, label) : renderEmbed(e, label)).join("");
-    return `<div class="quote" data-href="${postHref(fake)}">
+    return `<div class="quote" data-href="${postHref(fake)}" tabindex="0">
       <div class="meta">${avatar(r.author, 18)} <b>${vname(r.author)}</b> <span>${at(r.author.handle)} · ${ago(r.indexedAt)}</span></div>
       <div class="text">${richText(r.value?.text, r.value?.facets)}</div>${media}</div>`;
   }
@@ -439,7 +439,7 @@ export function renderPost(p, { reason, parent, thread = false, focus = false, l
     ${actionsBar(p, true)}
   </article>`;
   return `
-  <article class="post${line ? " has-line" : ""}${muted ? " mw-hidden" : ""}" data-uri="${esc(p.uri)}" data-href="${postHref(p)}"${feed ? ` data-feed="${esc(feed)}"${ctx ? ` data-fctx="${esc(ctx)}"` : ""}` : ""}>
+  <article class="post${line ? " has-line" : ""}${muted ? " mw-hidden" : ""}" tabindex="0" data-uri="${esc(p.uri)}" data-href="${postHref(p)}"${feed ? ` data-feed="${esc(feed)}"${ctx ? ` data-fctx="${esc(ctx)}"` : ""}` : ""}>
     ${muted ? `<button class="mw-note linklike small" data-act="showMuted">🙈 ${at(a.handle)} · приховано через слово «${esc(muted.value)}» · Показати</button>` : ""}
     <div class="left"><a href="${profileHref(a)}">${avatar(a)}</a>${line ? `<div class="tline"></div>` : ""}</div>
     <div class="body">
@@ -464,7 +464,7 @@ export function followBtn(a) {
 
 export function renderActor(a, extra = "") {
   actors.set(a.did, a);
-  return `<div class="actor" data-href="${profileHref(a)}">
+  return `<div class="actor" data-href="${profileHref(a)}" tabindex="0">
     ${avatar(a, 44)}
     <div class="who"><b>${vname(a)}</b><span class="muted">${at(a.handle)}${a.viewer?.followedBy ? ' <span class="pill">Стежить за вами</span>' : ""}</span>
       ${a.description ? `<div class="desc">${esc(a.description.slice(0, 160))}</div>` : ""}${extra}</div>
@@ -473,7 +473,7 @@ export function renderActor(a, extra = "") {
 }
 
 export function renderFeedCard(f) {
-  return `<div class="actor" data-href="#/feed/${enc(f.uri)}">
+  return `<div class="actor" data-href="#/feed/${enc(f.uri)}" tabindex="0">
     ${avatar({ avatar: f.avatar, displayName: f.displayName }, 44)}
     <div class="who"><b>${esc(f.displayName)}</b><span class="muted">Фід від ${at(f.creator.handle)} · ♥ ${num(f.likeCount)}</span>
       ${f.description ? `<div class="desc">${esc(f.description.slice(0, 200))}</div>` : ""}</div>
@@ -482,26 +482,62 @@ export function renderFeedCard(f) {
 }
 
 /* ---------- toast / modal / menu ---------- */
+// a polite live region: toasts, «Опубліковано», errors reach screen readers too
+export function announce(msg) {
+  let r = document.getElementById("sb-live");
+  if (!r) { r = document.createElement("div"); r.id = "sb-live"; r.className = "sr-only"; r.setAttribute("role", "status"); r.setAttribute("aria-live", "polite"); document.body.appendChild(r); }
+  r.textContent = ""; setTimeout(() => { r.textContent = String(msg); }, 50); // cleared first, so the same text is read again
+}
 export function toast(msg, ms = 2500) {
   const t = document.createElement("div");
   t.className = "toast"; t.innerHTML = esc(msg).replace(/🐝/g, bee(18)); // the text stays text; only the bee becomes the drawing
+  t.setAttribute("aria-hidden", "true"); // screen readers hear it once, from the live region below
   document.body.appendChild(t);
+  announce(msg);
   setTimeout(() => t.classList.add("out"), ms);
   setTimeout(() => t.remove(), ms + 400);
 }
 
 // canClose() may refuse when the user dismisses the modal (Esc, click outside); onClose() runs whenever it closes
+const FOCUSABLE = "a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select, textarea, [tabindex]:not([tabindex='-1'])";
 export function modal(html, { wide = false, canClose, onClose } = {}) {
   const wrap = document.createElement("div");
   wrap.className = "modal-bg";
-  wrap.innerHTML = `<div class="modal${wide ? " wide" : ""}">${html}</div>`;
+  wrap.innerHTML = `<div class="modal${wide ? " wide" : ""}" role="dialog" aria-modal="true">${html}</div>`;
+  const box = wrap.firstElementChild, back = document.activeElement;
+  const head = box.querySelector("h1, h2, h3");
+  if (head) { head.id ||= "dlg" + Math.random().toString(36).slice(2, 8); box.setAttribute("aria-labelledby", head.id); }
   const dismiss = () => { if (!canClose || canClose()) close(); };
   wrap.addEventListener("click", e => { if (e.target === wrap) dismiss(); });
-  const onKey = (e) => { if (e.key === "Escape") dismiss(); };
+  const focusables = () => [...box.querySelectorAll(FOCUSABLE)].filter(x => x.offsetParent !== null);
+  const onKey = (e) => {
+    if (e.key === "Escape") dismiss();
+    if (e.key === "Tab" && wrap === [...document.querySelectorAll(".modal-bg:not(.leaving)")].pop()) { // Tab goes round inside the window
+      const f = focusables(); if (!f.length) return;
+      if (!box.contains(document.activeElement)) { e.preventDefault(); f[0].focus(); }
+      else if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f.at(-1).focus(); }
+      else if (!e.shiftKey && document.activeElement === f.at(-1)) { e.preventDefault(); f[0].focus(); }
+    }
+  };
   document.addEventListener("keydown", onKey);
-  function close() { document.removeEventListener("keydown", onKey); leave(wrap); onClose?.(); } // the window plays its way out
+  function close() {
+    document.removeEventListener("keydown", onKey); leave(wrap); onClose?.(); // the window plays its way out
+    const top = [...document.querySelectorAll(".modal-bg:not(.leaving)")].pop();
+    if (back?.isConnected && (!top || top.contains(back))) back.focus?.({ preventScroll: true }); // focus returns to what opened it
+  }
   document.body.appendChild(wrap);
   wrap.close = close;
+  // the first field (or the box itself) gets the focus, unless the caller focused something on purpose right after
+  // not on a touch screen (the keyboard would pop up over a sheet) and never away from a field someone is typing in
+  setTimeout(() => {
+    if (!wrap.isConnected || box.contains(document.activeElement)) return;
+    const a = document.activeElement;
+    if (a && a !== document.body && a !== back && a.matches?.("input, textarea, select, [contenteditable]")) return;
+    const field = matchMedia("(pointer: fine)").matches && focusables().find(x => x.matches("input, textarea, select"));
+    const f = field || box;
+    if (f === box) box.tabIndex = -1;
+    f.focus({ preventScroll: true });
+  });
   return wrap;
 }
 
@@ -514,11 +550,12 @@ export function confirmBox(text, okLabel = "Так", danger = false) {
 
 // items: [{label, act, danger}] ; returns chosen act or null
 export function menu(anchor, items) {
-  document.querySelector(".popmenu")?.remove();
+  closeMenu();
   return new Promise(res => {
     const m = document.createElement("div");
     m.className = "popmenu";
-    m.innerHTML = items.map(i => i === "-" ? "<hr>" : `<button data-m="${esc(i.act)}" class="${i.danger ? "danger" : ""}">${i.label}</button>`).join("");
+    m.setAttribute("role", "menu");
+    m.innerHTML = items.map(i => i === "-" ? `<hr role="separator">` : `<button role="menuitem" data-m="${esc(i.act)}" class="${i.danger ? "danger" : ""}">${i.label}</button>`).join("");
     document.body.appendChild(m);
     const r = anchor.getBoundingClientRect();
     const w = m.offsetWidth, h = m.offsetHeight;
@@ -529,13 +566,32 @@ export function menu(anchor, items) {
     if (h > room) { m.style.maxHeight = Math.max(160, room) + "px"; m.style.overflowY = "auto"; }
     const mh = Math.min(h, Math.max(160, room));
     m.style.top = (mh <= below || below >= above ? r.bottom + 4 : Math.max(8, r.top - mh - 4)) + scrollY + "px";
-    const done = (v) => { leave(m); document.removeEventListener("click", outside, true); document.removeEventListener("keydown", esc_); res(v); };
+    let closed = false;
+    const done = (v) => {
+      if (closed) return; closed = true; leave(m); document.removeEventListener("click", outside, true); document.removeEventListener("keydown", esc_);
+      anchor.setAttribute?.("aria-expanded", "false");
+      if (v == null && m.contains(document.activeElement) && anchor.isConnected) anchor.focus?.({ preventScroll: true }); // keyboard users land back on the «⋯»
+      res(v);
+    };
     const outside = (e) => { if (!m.contains(e.target)) { e.stopPropagation(); e.preventDefault(); done(null); } };
-    const esc_ = (e) => { if (e.key === "Escape") { e.stopPropagation(); done(null); } }; // Esc (and Android «Back») closes the menu too
+    const esc_ = (e) => {
+      if (e.key === "Escape") { e.stopPropagation(); done(null); } // Esc (and Android «Back») closes the menu too
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { // arrows move between the items, round the ends
+        const b = [...m.querySelectorAll("button")], k = b.indexOf(document.activeElement);
+        e.preventDefault(); b[(k + (e.key === "ArrowDown" ? 1 : -1) + b.length) % b.length]?.focus();
+      }
+    };
+    anchor.setAttribute?.("aria-haspopup", "menu"); anchor.setAttribute?.("aria-expanded", "true");
+    setTimeout(() => { if (!closed && matchMedia("(pointer: fine)").matches) m.querySelector("button")?.focus({ preventScroll: true }); });
     document.addEventListener("keydown", esc_);
     m.addEventListener("click", e => { const b = e.target.closest("[data-m]"); if (b) done(b.dataset.m); });
-    setTimeout(() => document.addEventListener("click", outside, true));
+    m.close = () => done(null); // closed from outside (navigation, another menu): its listeners must go too
+    setTimeout(() => { if (!closed) document.addEventListener("click", outside, true); });
   });
+}
+// closes an open «⋯» menu together with its document listeners (a plain .remove() left them catching the next tap)
+export function closeMenu() {
+  document.querySelectorAll(".popmenu:not(.leaving)").forEach(m => m.close ? m.close() : m.remove());
 }
 
 // Photo viewer: a double tap (or double click) zooms in where you point, two fingers or the wheel zoom smoothly, a zoomed photo is dragged around,
@@ -543,9 +599,9 @@ export function menu(anchor, items) {
 // ⬇ saves the full-size file; ✕, Esc or a click beside the photo closes it
 export function lightbox(urls, i = 0, alts = []) {
   const m = modal(`<div class="lb"><div class="lb-bar"><span class="lb-n small"></span><div class="grow"></div>
-      <button class="lb-btn" data-lb="save" title="Зберегти фото">⬇</button><button class="lb-btn" data-lb="close" title="Закрити">✕</button></div>
-    <div class="lb-stage"><img src="${esc(urls[i])}" alt="" draggable="false"></div><p class="alt"></p>
-    ${urls.length > 1 ? `<button class="lb-prev">‹</button><button class="lb-next">›</button>` : ""}</div>`, { wide: true });
+      <button class="lb-btn" data-lb="save" title="Зберегти фото" aria-label="Зберегти фото">⬇</button><button class="lb-btn" data-lb="close" title="Закрити" aria-label="Закрити">✕</button></div>
+    <div class="lb-stage"><img src="${esc(urls[i])}" alt="" draggable="false"></div><p class="alt" aria-hidden="true"></p>
+    ${urls.length > 1 ? `<button class="lb-prev" title="Попереднє фото" aria-label="Попереднє фото">‹</button><button class="lb-next" title="Наступне фото" aria-label="Наступне фото">›</button>` : ""}</div>`, { wide: true });
   m.classList.add("dark");
   const img = m.querySelector("img"), alt = m.querySelector(".alt"), stage = m.querySelector(".lb-stage");
   let z = 1, x = 0, y = 0;
@@ -563,7 +619,7 @@ export function lightbox(urls, i = 0, alts = []) {
     if (z === 1) { x = 0; y = 0; }
     apply();
   };
-  const show = () => { img.src = urls[i]; alt.textContent = alts[i] || ""; m.querySelector(".lb-n").textContent = urls.length > 1 ? `${i + 1} / ${urls.length}` : ""; reset(); ready = fetchBlob(urls[i]); };
+  const show = () => { img.src = urls[i]; alt.textContent = alts[i] || ""; img.alt = alts[i] || T("Фото"); m.querySelector(".lb-n").textContent = urls.length > 1 ? `${i + 1} / ${urls.length}` : ""; reset(); ready = fetchBlob(urls[i]); };
   // the file is fetched in advance (it is already in the cache from showing it), so ⬇ can open the share sheet right inside the tap — iPhone refuses it after a wait
   const fetchBlob = (u) => matchMedia("(pointer: coarse)").matches ? fetch(u).then(r => r.ok ? r.blob() : null).then(b => (b && /^image\//.test(b.type) ? b : null)).catch(() => null) : null;
   let ready = null;
@@ -619,7 +675,7 @@ export function lightbox(urls, i = 0, alts = []) {
   stage.addEventListener("wheel", (e) => { e.preventDefault(); zoomAt(z * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX, e.clientY); }, { passive: false });
   stage.addEventListener("click", (e) => { if (bare && !moved) m.close(); });
   const arrows = (e) => {
-    if (!m.isConnected) return document.removeEventListener("keydown", arrows);
+    if (!m.isConnected || m.classList.contains("leaving")) return document.removeEventListener("keydown", arrows);
     if (e.key === "ArrowLeft") m.querySelector(".lb-prev")?.click();
     if (e.key === "ArrowRight") m.querySelector(".lb-next")?.click();
   };
@@ -711,7 +767,14 @@ export function infinite(container, loader, root = null) {
     if (!e.isIntersecting || busy || done) return;
     busy = true;
     try { done = !(await loader()); }
-    catch (err) { sentinel.innerHTML = `<p class="err">${esc(errText(err))}</p>`; done = true; }
+    catch (err) {
+      // the error with a way to try again (a stalled feed used to show only a small red line)
+      sentinel.innerHTML = `<div class="card pad center"><p class="err">${esc(errText(err))}</p><button type="button" class="ghost sm" data-retry>↻ Спробувати ще</button></div>`;
+      sentinel.querySelector("[data-retry]").addEventListener("click", () => {
+        sentinel.innerHTML = `<div class="spinner"></div>`; done = false; io.unobserve(sentinel); io.observe(sentinel);
+      });
+      done = true;
+    }
     busy = false;
     if (done && !sentinel.querySelector(".err")) sentinel.innerHTML = `<p class="muted center small theend">Це все ${bee(18)}</p>`;
     else if (!done) { io.unobserve(sentinel); io.observe(sentinel); }

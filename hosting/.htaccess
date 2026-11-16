@@ -32,6 +32,18 @@ ErrorDocument 504 /errors/504.html
   Header always set X-Content-Type-Options "nosniff"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
   Header always set X-Frame-Options "DENY"
+  # CSP also as a header for the app page: there frame-ancestors works (a <meta> ignores it). Keep it the same as the
+  # <meta> in index.html (without the desktop app: scheme). Not on the error pages: they have small inline scripts of their own
+  <Files "index.html">
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https:; font-src 'self' data:; worker-src 'self' blob:; manifest-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://player.twitch.tv https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+  </Files>
+  # nothing the site does not use: no camera, microphone, location, payments; motion sensors only for the glass tilt
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(self), gyroscope=(self)"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  # service pages stay out of search results even if a crawler ignores their <meta>
+  <FilesMatch "^(404|offline|403|500|502|503|504)\.html$">
+    Header set X-Robots-Tag "noindex"
+  </FilesMatch>
   Header always set Strict-Transport-Security "max-age=31536000" "expr=%{HTTPS} == 'on'"
   # дані позицій виконавців читають застосунки з інших адрес
   <Files "stars.json">

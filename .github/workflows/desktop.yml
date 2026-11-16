@@ -211,7 +211,7 @@ jobs:
             [ -d "$d" ] || continue
             cp -a "$d" "$d.rw" && rm -rf "$d" && mv "$d.rw" "$d"
           done
-      - uses: flathub-infra/flatpak-github-actions/flatpak-builder@933e9e8ca36e85046ebca8e211f0785c6becac40
+      - uses: flathub-infra/flatpak-github-actions/flatpak-builder@933e9e8ca36e85046ebca8e211f0785c6becac40 # master, pinned (no release tags)
         with:
           bundle: Skybee.flatpak
           manifest-path: flatpak/io.github.vysocavnu.skybee.yml
