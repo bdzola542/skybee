@@ -1,0 +1,79 @@
+# Заливає сайт Skybee на власний хостинг (NIC.UA) після кожної зміни в main і після щоденного оновлення data/stars.json.
+# Налаштування (Settings → Secrets and variables → Actions):
+#   секрети:  HOSTING_HOST (адреса FTP-сервера з панелі NIC.UA), HOSTING_USER, HOSTING_PASS
+#   змінні:   HOSTING_DIR   — тека сайту на сервері (з панелі NIC.UA, напр. «yourdomain.ua/www»)
+#             HOSTING_PROTO — ftp (за замовчуванням, лише з шифруванням TLS) або sftp (якщо на тарифі є SSH;
+#                             тоді ще секрет HOSTING_KNOWN_HOSTS — вивід `ssh-keyscan <сервер>`)
+#   HOSTING_HOST — саме те ім'я, на яке виписаний сертифікат сервера (перевірку сертифіката не вимикати)
+# Без секретів workflow нічого не робить (GitHub Pages працює як і раніше).
+name: Hosting (NIC.UA)
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["index.html", "404.html", "offline.html", "favicon.ico", "manifest.webmanifest", "sw.js",
+            "css/**", "js/**", "icons/**", "errors/**", "data/**", "hosting/**", ".github/workflows/hosting.yml"]
+  workflow_run:
+    workflows: ["Stars about war"] # його коміт від GITHUB_TOKEN сам інших workflow не запускає
+    types: [completed]
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hosting
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Чи налаштовано хостинг
+        id: cfg
+        env:
+          H: ${{ secrets.HOSTING_HOST }}
+        run: |
+          if [ -z "$H" ]; then echo "::notice::Секрети HOSTING_* не задані — пропускаю"; echo "ok=0" >> "$GITHUB_OUTPUT"; else echo "ok=1" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: steps.cfg.outputs.ok == '1'
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Зібрати сайт
+        if: steps.cfg.outputs.ok == '1'
+        run: |
+          mkdir site
+          cp -r index.html 404.html offline.html favicon.ico manifest.webmanifest sw.js css js icons errors data site/
+          cp hosting/.htaccess site/
+          echo "{\"time\": $(date +%s)000}" > site/build.json
+      - name: Залити на хостинг
+        if: steps.cfg.outputs.ok == '1'
+        env:
+          HOST: ${{ secrets.HOSTING_HOST }}
+          LOGIN: ${{ secrets.HOSTING_USER }}
+          LFTP_PASSWORD: ${{ secrets.HOSTING_PASS }}
+          DIR: ${{ vars.HOSTING_DIR }}
+          PROTO: ${{ vars.HOSTING_PROTO || 'ftp' }}
+          KNOWN_HOSTS: ${{ secrets.HOSTING_KNOWN_HOSTS }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lftp >/dev/null
+          case "$PROTO" in ftp|sftp) ;; *) echo "HOSTING_PROTO має бути ftp або sftp"; exit 1;; esac
+          [[ "$HOST$LOGIN${DIR:-.}" =~ ^[A-Za-z0-9._@/~-]+$ ]] || { echo "HOSTING_HOST / HOSTING_USER / HOSTING_DIR: недозволені символи"; exit 1; }
+          if [ "$PROTO" = sftp ]; then
+            # ключ сервера — лише відомий (рядок known_hosts із секрету), інакше підмінений сервер отримав би пароль
+            [ -n "$KNOWN_HOSTS" ] || { echo "Для sftp потрібен секрет HOSTING_KNOWN_HOSTS (вивід ssh-keyscan сервера)"; exit 1; }
+            mkdir -p ~/.ssh && printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          fi
+          # без --delete: якщо HOSTING_DIR вказано не ту теку, нічого чужого не зітреться.
+          # index.html і sw.js — останніми, щоб відвідувач не отримав нову оболонку зі старими js
+          lftp -c "
+            set net:max-retries 3; set net:timeout 30;
+            set ftp:ssl-force true; set ftp:ssl-protect-data true;
+            open --env-password -u \"$LOGIN\" $PROTO://$HOST;
+            mirror -R --verbose --parallel=4 -X index.html -X sw.js site/ \"${DIR:-.}\";
+            cd \"${DIR:-.}\";
+            put site/sw.js; put site/index.html
+          "
