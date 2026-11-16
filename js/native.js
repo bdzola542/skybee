@@ -51,11 +51,20 @@ function closeTop() {
 
 /* ---------- swipe back (the apps: Android, iOS, the desktop app on a touch screen) ---------- */
 // A finger from the left edge pulled to the right: one step back, like «Back» on Android and the edge swipe on iPhone.
-// A round arrow follows the finger and turns gold once letting go will go back; pulling back or moving up/down cancels.
+// The screen (or the open window) follows the finger at once; let go past the threshold and it goes back, else it slides home.
 if (isNative || window.skybeeDesktop) {
   const EDGE = 32, GO = 80;
-  let x0 = null, y0 = 0, dx = 0, on = false, arrow = null;
-  const drop = () => { arrow?.remove(); arrow = null; x0 = null; on = false; };
+  let x0 = null, y0 = 0, dx = 0, on = false, el = null;
+  const layer = () => document.querySelector(".modal-bg:not(.leaving) .modal, .msheet-bg:not(.leaving) .msheet")
+    || (document.body.classList.contains("drawer") || history.length <= 1 || /^#?\/?$/.test(location.hash) ? null : document.getElementById("main"));
+  const home = (animate) => {
+    const t = el; el = null;
+    if (!t) return;
+    if (!animate) { t.style.transition = t.style.transform = ""; return; }
+    t.style.transition = "transform .2s ease-out"; t.style.transform = "translateX(0)";
+    setTimeout(() => { if (!el) t.style.transition = t.style.transform = ""; }, 230); // not if a new swipe has already taken it
+  };
+  const drop = () => { home(on); x0 = null; on = false; };
   addEventListener("touchstart", (e) => {
     const t = e.touches[0];
     drop();
@@ -69,19 +78,17 @@ if (isNative || window.skybeeDesktop) {
     const dy = Math.abs(t.clientY - y0);
     if (!on) {
       if (dy > 14 && dy > dx) return drop(); // scrolling up or down, not a swipe
-      if (dx < 14) return;
-      on = true;
-      arrow = document.createElement("div"); arrow.className = "swipeback"; arrow.textContent = "←";
-      document.body.appendChild(arrow);
+      if (dx < 8) return;
+      el = layer();
+      if (!el) return drop();
+      on = true; el.style.transition = "none";
     }
-    arrow.style.top = y0 + "px";
-    arrow.style.transform = `translate(${Math.min(Math.max(dx, 0), GO * 1.4) * .7 - 44}px, -50%)`;
-    arrow.classList.toggle("ready", dx >= GO);
+    el.style.transform = `translateX(${Math.max(dx, 0)}px)`; // follows the finger
   }, { passive: true });
   const end = () => {
-    const go = on && dx >= GO;
-    drop();
-    if (go && !closeTop() && history.length > 1 && !/^#?\/?$/.test(location.hash)) history.back();
+    const goBack = on && dx >= GO;
+    if (goBack) { home(false); x0 = null; on = false; if (!closeTop() && history.length > 1 && !/^#?\/?$/.test(location.hash)) history.back(); }
+    else drop();
   };
   addEventListener("touchend", end, { passive: true });
   addEventListener("touchcancel", drop, { passive: true });

@@ -247,7 +247,7 @@ nav.bottom, .fab, .only-mobile { display: none; }
 .lb { position: relative; text-align: center; }
 .lb-stage { overflow: hidden; display: flex; align-items: center; justify-content: center; min-height: 60vh; touch-action: none; }
 .lb img { max-width: 100%; max-height: 80vh; border-radius: 8px; cursor: zoom-in; transform-origin: center; transition: transform .15s; user-select: none; }
-.lb img.zoomed { cursor: grab; transition: none; }
+.lb img.zoomed { cursor: grab; }
 .lb-bar { display: flex; align-items: center; gap: 8px; color: #ddd; padding: 0 4px 8px; }
 .lb .lb-btn { position: static; width: 40px; height: 40px; font-size: 18px; }
 .lb .alt { color: #ddd; font-size: 14px; }
@@ -790,10 +790,9 @@ nav.side::-webkit-scrollbar, .tabs::-webkit-scrollbar, .nchips::-webkit-scrollba
   .imgs.n2 img, .imgs.n3 img, .imgs.n4 img { max-height: 46vh; }
 }
 
-/* swipe back from the left edge in the apps (js/native.js) */
-.swipeback { position: fixed; left: 0; z-index: 90; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; pointer-events: none;
-  background: var(--panel); color: var(--text); border: 1px solid var(--line); font-size: 20px; box-shadow: 0 4px 16px rgba(0,0,0,.35); transition: background .12s, color .12s; }
-.swipeback.ready { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+/* the feed tabs of the home screen stay under the top bar while the feed scrolls (js/views.js sets --tbh to the bar's height) */
+body.guest #feedTabs { top: calc(var(--tbh, 54px) + 49px); }
+#feedTabs { position: sticky; top: var(--tbh, 54px); z-index: 9; background: color-mix(in srgb, var(--bg) 92%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
 
 /* =====================================================================
    Skybee 2.0 — «The Social Hive»: the same screens and classes, a look of its own.
@@ -1446,12 +1445,12 @@ main.nav-tab { animation: sb-tab-in .24s ease-out; }
 @keyframes sb-item-in { from { opacity: 0; translate: 0 10px; } }
 @keyframes ios-item-in { from { opacity: 0; translate: 0 6px; } }
 @keyframes m-item-in { from { opacity: 0; } }
-.plist > :is(.post, .notif, .actor) { animation: sb-item-in .36s var(--ease-move) backwards; }
-:root[data-ui="glass"] .plist > :is(.post, .notif, .actor) { animation-name: ios-item-in; }
-:root[data-ui="material"] .plist > :is(.post, .notif, .actor) { animation-name: m-item-in; animation-duration: .25s; }
-.plist > :nth-child(2) { animation-delay: .03s; } .plist > :nth-child(3) { animation-delay: .06s; }
-.plist > :nth-child(4) { animation-delay: .09s; } .plist > :nth-child(5) { animation-delay: .12s; }
-.plist > :nth-child(6) { animation-delay: .15s; }
+/* only the first screenful arrives with motion, and quickly: the rest (and every next page) just appears */
+.plist > :is(.post, .notif, .actor):nth-child(-n+5) { animation: sb-item-in .2s var(--ease-move) backwards; }
+:root[data-ui="glass"] .plist > :is(.post, .notif, .actor):nth-child(-n+5) { animation-name: ios-item-in; }
+:root[data-ui="material"] .plist > :is(.post, .notif, .actor):nth-child(-n+5) { animation-name: m-item-in; animation-duration: .16s; }
+.plist > :nth-child(2) { animation-delay: .02s; } .plist > :nth-child(3) { animation-delay: .04s; }
+.plist > :nth-child(4) { animation-delay: .06s; } .plist > :nth-child(5) { animation-delay: .08s; }
 
 /* ---------- windows (modal), bottom sheets, the chat message sheet ---------- */
 @keyframes fade-in { from { opacity: 0; } } @keyframes fade-out { to { opacity: 0; } }

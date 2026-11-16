@@ -97,6 +97,8 @@ export const forgetHomeTabs = () => { tabsCache = null; };
 
 export async function home(el) {
   el.innerHTML = `<div class="topbar">${MENU_BTN}<h2 class="brand">${bee(28)} Skybee</h2><div class="grow"></div>${gridBtn("home")}<button class="ghost icon" data-act="refresh" title="Оновити">↻</button></div><div class="tabs" id="feedTabs"></div><div id="feedBody"></div>`;
+  const bar = $(".topbar", el); // the feed tabs stick right under it
+  if (bar) new ResizeObserver(() => el.style.setProperty("--tbh", bar.offsetHeight + "px")).observe(bar);
   const tabs = await homeTabs();
   let sel = 0; try { sel = Math.min(+sessionStorage.getItem("skybee.tab") || 0, tabs.length - 1); } catch {}
   const tabEl = $("#feedTabs", el), body = $("#feedBody", el);
@@ -768,6 +770,7 @@ export async function messages(el, { requests = false } = {}) {
   el.innerHTML = header("Повідомлення", false, `<button class="ghost sm" data-act="newDm">✉️ Нове</button>`) +
     `<div class="tabs"><a href="#/messages" class="${requests ? "" : "on"}">Чати</a><a href="#/messages/requests" class="${requests ? "on" : ""}">Запити</a></div>`;
   try {
+    swipeChats(el, requests); // (the list box comes from paged just below; the swipe looks it up on touch)
     return paged(el, async (cursor) => {
       const d = await api.chat("chat.bsky.convo.listConvos", { limit: 30, cursor, status: requests ? "request" : "accepted" });
       return {
@@ -783,6 +786,35 @@ export async function messages(el, { requests = false } = {}) {
       };
     });
   } catch (e) { el.insertAdjacentHTML("beforeend", dmError(e)); }
+}
+// Swipe sideways on the chats screen: Чати ↔ Запити; the list follows the finger. Not from the left edge («Back» in the apps)
+function swipeChats(el, requests) {
+  const L = () => el.querySelector(".plist"); // made by paged() right after this call
+  el._swipe?.abort(); // the screen element is reused: one set of listeners at a time
+  const ac = el._swipe = new AbortController(), o = { signal: ac.signal, passive: true };
+  let x0 = null, y0 = 0, dx = 0, horiz = null;
+  const look = (x, t) => { const list = L(); if (!list) return; list.style.transition = t || "none"; list.style.transform = x ? `translateX(${x}px)` : ""; };
+  el.addEventListener("touchstart", (e) => {
+    const t = e.touches[0];
+    x0 = L() && el.querySelector('.tabs a[href="#/messages"]') && e.touches.length === 1 && t.clientX > 36 && !e.target.closest("input, textarea, .topbar, .tabs") ? t.clientX : null;
+    y0 = t.clientY; dx = 0; horiz = null;
+  }, o);
+  el.addEventListener("touchmove", (e) => {
+    if (x0 == null) return;
+    const t = e.touches[0]; dx = t.clientX - x0; const dy = t.clientY - y0;
+    if (horiz === null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) horiz = Math.abs(dx) > Math.abs(dy) * 1.4;
+    if (!horiz) return;
+    const ok = requests ? dx > 0 : dx < 0; // only toward the other tab; the other way gives a little
+    look(ok ? dx * .55 : dx * .12);
+  }, o);
+  const end = () => {
+    if (x0 == null) return;
+    x0 = null;
+    if (!horiz) return;
+    if (Math.abs(dx) > 70 && (requests ? dx > 0 : dx < 0)) { look(0); location.hash = requests ? "#/messages" : "#/messages/requests"; }
+    else look(0, "transform .25s var(--ease-move, ease-out)");
+  };
+  el.addEventListener("touchend", end, o); el.addEventListener("touchcancel", end, o);
 }
 
 const dmError = (e) => `<div class="card pad"><p class="err">${esc(errText(e))}</p><p class="small muted">Щоб працювали чати, створи пароль застосунку з галочкою <b>«Allow access to your direct messages»</b> і увійди з ним знову.</p></div>`;

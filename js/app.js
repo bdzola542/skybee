@@ -647,17 +647,21 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
   addEventListener("pointerdown", (e) => {
     const row = e.target.closest?.(ROW);
     if (!row || !glass() || e.pointerType === "mouse" || !row.classList.contains("rowfit")) return;
-    drag = { row, x0: e.clientX, from: current(row), cur: current(row), moved: false };
+    drag = { row, x0: e.clientX, y0: e.clientY, from: current(row), cur: current(row), moved: false };
   }, { passive: true });
   addEventListener("pointermove", (e) => {
     if (!drag) return;
-    if (!drag.moved && Math.abs(e.clientX - drag.x0) < 10) return;
+    if (!drag.moved) {
+      const dx = Math.abs(e.clientX - drag.x0), dy = Math.abs(e.clientY - drag.y0);
+      if (dy > 10 && dy > dx) { const r = drag.row; drag = null; place(r); return; } // the finger is scrolling the page, not carrying the bubble: nothing is chosen
+      if (dx < 10 || dx < dy * 1.5) return;
+    }
     drag.moved = true; drag.row.classList.add("dragging");
     const c = under(drag.row, e.clientX);
     if (c && c !== drag.cur) { drag.cur?.classList.remove("peek"); drag.cur = c; c.classList.add("peek"); place(drag.row, c); navigator.vibrate?.(6); }
   }, { passive: true });
   addEventListener("pointerup", () => end(true), { passive: true });
-  addEventListener("pointercancel", () => end(true), { passive: true });
+  addEventListener("pointercancel", () => end(false), { passive: true }); // the browser took the touch (the page scrolls): never a choice
 }
 
 /* ---------- Material ripple: a circle spreads from the finger on buttons and menu items (Settings → Appearance) ---------- */
