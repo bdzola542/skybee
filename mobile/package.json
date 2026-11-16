@@ -7,7 +7,7 @@
     "web": "node ../scripts/dist.mjs mobile/www"
   },
   "dependencies": {
-    "@capacitor/android": "7.6.10",
+    "@capacitor/android": "8.6.2",
     "@capacitor/app": "7.1.2",
     "@capacitor/cli": "7.6.10",
     "@capacitor/core": "7.6.10",
