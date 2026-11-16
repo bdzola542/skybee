@@ -11,7 +11,7 @@ on:
   push:
     tags: ["v*"]
     branches: ["main"] # лише main: інакше кожна зміна збиралася двічі (гілка + злиття) і гілка перезаписувала тестові релізи
-    paths: ["mobile/**", "scripts/dist.mjs", ".github/workflows/mobile.yml", "index.html", "css/**", "js/**", "icons/**"]
+    paths: ["mobile/**", "scripts/dist.mjs", "scripts/app-icons.mjs", ".github/workflows/mobile.yml", "index.html", "css/**", "js/**", "icons/**"]
   workflow_dispatch:
     inputs:
       version:
@@ -74,6 +74,8 @@ jobs:
           open(p, "w").write(s)
           PY
           grep -n "skybee\|allowBackup" android/app/src/main/AndroidManifest.xml
+      - name: Готові значки (вибір кольору іконки в налаштуваннях)
+        run: node ../scripts/app-icons.mjs android
       - name: Версія
         run: |
           V=$(node -p "require('./package.json').version")
@@ -173,12 +175,18 @@ jobs:
           plutil -replace CFBundleDisplayName -string "Skybee" $P
           plutil -replace CFBundleURLTypes -json '[{"CFBundleURLName":"io.github.vysocavnu.skybee","CFBundleURLSchemes":["skybee"]}]' $P
           plutil -p $P | grep -A3 CFBundleURLTypes
+      - name: Готові значки (вибір кольору іконки в налаштуваннях)
+        run: |
+          ICONS=$(node ../scripts/app-icons.mjs ios)
+          test -n "$ICONS"
+          echo "ICONS=$ICONS" >> "$GITHUB_ENV"
       - name: Збірка IPA (без підпису)
         run: |
           V=$(node -p "require('./package.json').version")
           xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphoneos \
             -destination 'generic/platform=iOS' -derivedDataPath build \
             MARKETING_VERSION=$V CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES="$ICONS" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" build | tail -30
           mkdir -p Payload
           cp -R build/Build/Products/Release-iphoneos/App.app Payload/

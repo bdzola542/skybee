@@ -1,0 +1,9 @@
+{
+  "name": "skybee-icon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Зміна значка Skybee на екрані телефона: готові кольорові варіанти (Android — activity-alias, iOS — альтернативні іконки)",
+  "files": ["android/", "ios/", "SkybeeIcon.podspec"],
+  "capacitor": { "ios": { "src": "ios" }, "android": { "src": "android" } },
+  "peerDependencies": { "@capacitor/core": ">=7.0.0" }
+}
