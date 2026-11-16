@@ -1383,4 +1383,5 @@ export default {
   "До посту →": "Go to the post →",
   "🔒 Оформлення Skybee безпечне для твоєї IP-адреси: чужі записи читаються через публічний кеш, а іграшка — з CDN, тож сервер власника профілю тебе не бачить.": "🔒 Skybee looks are safe for your IP address: other people's records are read through a public cache and the toy comes from a CDN, so the profile owner's server never sees you.",
   "Пошук GIF потребує ключа Tenor (Налаштування → Вміст і медіа). Поки що вибери GIF-файл із пристрою": "GIF search needs a Tenor key (Settings → Content and media). For now, pick a GIF file from your device",
+  "Цю версію оновлює Flatpak (якщо встановлена через репозиторій skybee): відкрий «Програми» (GNOME Software чи Discover) або виконай flatpak update.": "This version is updated by Flatpak (if installed from the skybee repository): open Software (GNOME Software or Discover) or run flatpak update.",
 };

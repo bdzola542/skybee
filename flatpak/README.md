@@ -27,3 +27,19 @@
 - **Мережа й приватність** описані в metainfo (розділ Privacy): які сторонні сервіси і коли. Власної телеметрії немає. При додаванні нового сервісу — дописати туди.
 - **Дозволи пісочниці** — мінімум (мережа, сокет вікон, звук, GPU); без `--filesystem=home`. Перед подачею: `flatpak run --command=flatpak-builder-lint org.flatpak.Builder manifest io.github.vysocavnu.skybee.yml` і `… appstream io.github.vysocavnu.skybee.metainfo.xml`.
 - **Вміст**: OARS-оцінка («social-chat», «social-info» — intense) уже вказана.
+
+## Власний Flatpak-репозиторій (оновлення без Flathub)
+Кожен реліз (`vX.Y.Z`) job `flatpak-repo` у `.github/workflows/desktop.yml` збирає з `Skybee.flatpak` підписаний OSTree-репозиторій і заливає його на хостинг
+у `https://skybee.online/flatpak/repo/` разом із `skybee.flatpakrepo` і `skybee.flatpakref`. Користувач:
+```
+flatpak remote-add --user skybee https://skybee.online/flatpak/skybee.flatpakrepo
+flatpak install --user skybee io.github.vysocavnu.skybee      # далі оновлює `flatpak update`
+```
+Установка з одного файлу `Skybee.flatpak` теж працює, але **не оновлюється** (бандл не знає про репозиторій): для оновлень ставити лише через `remote-add`.
+**Один раз (власник):** створити ключ підпису без пароля й покласти приватну частину в секрет GitHub `FLATPAK_GPG_KEY` (секрети `HOSTING_*` уже є):
+```
+gpg --batch --passphrase '' --quick-gen-key "Skybee Flatpak <you@example.com>" rsa4096 sign never
+gpg --armor --export-secret-keys "Skybee Flatpak"        # увесь вивід — у секрет FLATPAK_GPG_KEY
+```
+Збережи **зашифровану резервну копію** приватного ключа офлайн (менеджер паролів, флешка): втрата ключа = усі користувачі мусять перевстановити репозиторій. Зроби й відкличний сертифікат (`gpg --gen-revoke`) і теж збережи його окремо.
+Відбиток ключа (`gpg --fingerprint "Skybee Flatpak"`) опублікуй у README/на сайті, щоб його можна було звірити. Без секрету job сам пропускається; запускається лише з `main` або тегу.
