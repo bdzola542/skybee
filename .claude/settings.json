@@ -4,7 +4,6 @@
   },
   "enabledPlugins": { "ecc@ecc": true },
   "hooks": {
-  "hooks": {
     "PreToolUse": [
       {
         "matcher": "Bash|PowerShell",
