@@ -23,6 +23,7 @@ Skybee — відкритий клієнт для Bluesky (AT Protocol). Авт�
   Закриття вікна ховає Skybee в трей (сповіщення й далі приходять; «Вийти» — у меню трею; там же «Запускати разом із Windows» → `--hidden`).
   `preload.js` — єдиний міст: `version()`, `update()`, `onLink(cb)` (посилання `skybee://`). Дозволи Electron — лише сповіщення (для Skybee), повний екран, копіювання, DRM (`setPermissionRequestHandler`);
   F12 — лише з вихідного коду або `SKYBEE_DEVTOOLS=1`; electron fuses (без RunAsNode / NODE_OPTIONS / --inspect) у `build.electronFuses`.
+  **Правило автора: коли Skybee вже випущено у Flathub, для Linux робити лише Flatpak** — окрему версію для Linux (AppImage, `latest-linux.yml`) більше не збирати й не викладати в релізи. tar.gz лишається лише як вихідник для Flatpak (маніфест бере його з релізу), у списку файлів для людей його не давати. До першого релізу у Flathub — як нижче.
   Версія — у `desktop/package.json`. **Linux**: той самий workflow збирає AppImage (оновлюється сам, `latest-linux.yml`) і tar.gz,
   а з tar.gz — **Flatpak** (`flatpak/`: маніфест на `org.electronjs.Electron2.BaseApp` + zypak, `.desktop`, metainfo, іконка; README — як подати у Flathub).
   У Flatpak вимкнене і самооновлення оболонки, і завантаження вебчастини з сайту (правила Flathub) — оновлює лише Flathub. Скріншоти для каталогу — `docs/screenshots/`. Далі за планом: macOS.
