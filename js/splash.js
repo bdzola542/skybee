@@ -26,7 +26,11 @@ function hsl(c) {
 function look() {
   const t = ls("skybee.theme") || "dark";
   const night = (t === "system" ? (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark") : t) !== "light";
-  const c = /^#[0-9a-f]{6}$/i.test(ls("skybee.color") || "") ? ls("skybee.color").toLowerCase() : null;
+  // the colour of the account that is signed in: its app colour, else its Skybee profile colour (js/settings.js appColor, flair.js)
+  let did = ""; try { did = JSON.parse(ls("skybee.session") || "null")?.did || ""; } catch {}
+  const own = ls("skybee.color@" + did); // "" — gold chosen on purpose
+  const pick = own != null ? own : [ls("skybee.color"), ls("skybee.pc@" + did)].find(v => /^#[0-9a-f]{6}$/i.test(v || ""));
+  const c = /^#[0-9a-f]{6}$/i.test(pick || "") ? pick.toLowerCase() : null;
   const h = c && hsl(c);
   if (h && (h.h < 16 || h.h > 340) && h.s > .4 && h.l > .2 && h.l < .8) // red: the Eclipse
     return { cls: "eclipse", vars: { "--sp-bee-hi": "#4a0c0c", "--sp-bee-lo": "#0c0000" } };

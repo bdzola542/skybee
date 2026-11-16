@@ -1776,3 +1776,13 @@ html.lg-refract:root[data-ui="glass"] { --lg-filter: url(#lg-refract) blur(var(-
 body.detail main article.post.is-open { box-shadow: inset 3px 0 0 var(--accent); }
 article.post.kbd-on { box-shadow: inset 3px 0 0 var(--accent), 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); border-radius: 12px; }
 .kbd-help td { padding: 5px 10px 5px 0; vertical-align: top; } .kbd-help kbd { white-space: nowrap; }
+
+/* ---------- the feed tabs stay in sight: under the top bar while the feed scrolls (views.js sets --tbh) ---------- */
+#feedTabs { position: sticky; top: var(--tbh, 54px); z-index: 9; background: var(--bg); }
+:root[data-ui="material"].scrolled #feedTabs { background: var(--m-s2); }
+:root[data-ui="glass"] #feedTabs { background: color-mix(in srgb, var(--bg) 62%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6); }
+.chat { overflow-anchor: none; } /* views.js keeps the place itself when earlier messages come in */
+/* «↑ Нові пости» sits below the sticky feed tabs where they are shown */
+#feedTabs + .newpill { top: calc(var(--tbh, 54px) + var(--tabh, 0px) + 10px); }
+@media (pointer: coarse) { .nchips + * { touch-action: pan-y; } } /* sideways on the notifications list switches the filter (views.js) */

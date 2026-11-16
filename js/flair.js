@@ -58,8 +58,10 @@ export function load(did) {
     // someone else's own server would see the IP and the time of everyone opening their profile: only on request
     if (did !== api.session?.did && !api.bskyHost(pds) && !flairAll()) return null;
     const r = await fetch(`${pds}/xrpc/com.atproto.repo.getRecord?repo=${encodeURIComponent(did)}&collection=${NSID}&rkey=self`);
-    if (!r.ok) return null; // no record: this person has no Skybee look
+    if (!r.ok) { if (did === api.session?.did && r.status === 400) try { localStorage.removeItem("skybee.pc@" + did); } catch {} return null; } // no record: this person has no Skybee look
     const rec = clean((await r.json()).value);
+    // the own profile colour, for the launch scene (js/splash.js runs before anything is loaded)
+    if (did === api.session?.did) try { rec?.color ? localStorage.setItem("skybee.pc@" + did, rec.color) : localStorage.removeItem("skybee.pc@" + did); } catch {}
     return rec && { rec, pds };
   })().catch(() => null));
   return cache.get(did);
