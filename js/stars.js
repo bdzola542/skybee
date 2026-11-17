@@ -28,13 +28,15 @@ let ready = null;
 // → { find(name) → entry | null } ; entry: { slug, status, names, excerpt, url }
 export function stars() {
   return ready ||= (async () => {
-    const url = location.protocol.startsWith("http") && location.hostname !== "localhost" ? "data/stars.json" : SITE + "data/stars.json";
+    // fresh data lives on skybee.online (the stars-data branch → hosting); the GitHub Pages mirror only has an older copy
+    const url = location.origin + "/" === SITE ? "data/stars.json" : SITE + "data/stars.json";
     const r = await fetch(url);
     if (!r.ok) throw new Error("stars " + r.status);
     const d = await r.json();
     const index = new Map();
-    for (const [slug, status, names, excerpt, points] of d.artists || []) {
-      if (!STATUS[status]) continue;
+    for (let [slug, status, names, excerpt, points] of Array.isArray(d.artists) ? d.artists.filter(Array.isArray) : []) {
+      if (!Object.hasOwn(STATUS, status) || typeof slug !== "string" || !Array.isArray(names)) continue; // a broken entry is skipped, not fatal
+      names = names.filter(n => typeof n === "string");
       const e = { slug, status, names, excerpt: String(excerpt || ""), points: Array.isArray(points) ? points.map(String).slice(0, 6) : [], url: `${SOURCE}/${encodeURIComponent(slug)}` };
       for (const n of [...names, slug.replace(/-/g, " ")]) for (const k of keys(n)) if (!index.has(k)) index.set(k, e);
     }
