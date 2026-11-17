@@ -341,6 +341,13 @@ const navStack = [];
 // A tap or drag on the tab bar (or a menu item) is a switch between tabs, never «back» or «forward», even when the tab was the previous screen
 let tabTapAt = 0;
 for (const ev of ["pointerdown", "click"]) document.addEventListener(ev, (e) => { if (e.target.closest?.("nav [data-nav]")) tabTapAt = Date.now(); }, { capture: true, passive: true });
+// the bubble answers the tap at once, not when the new screen has been set up (it stayed on the old tab for a moment): route() confirms it afterwards
+document.addEventListener("click", (e) => {
+  const a = e.target.closest?.("nav.bottom a[data-nav]");
+  if (!a || a.classList.contains("on") || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  document.querySelectorAll("nav.bottom a[data-nav].on").forEach(x => x.classList.remove("on"));
+  a.classList.add("on"); placeLens(a);
+});
 function navKind(path) {
   const h = location.hash || "#/";
   const tab = [...document.querySelectorAll("[data-nav]")].some(a => {
