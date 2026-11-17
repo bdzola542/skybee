@@ -17,6 +17,9 @@ if (isNative) {
     let edge = null; // decided once: the keyboard later shrinks the page, which must not switch the insets off
     const put = (r) => {
       const i = r?.insets; if (!i) return;
+      // Capacitor 8 already gave the real insets (--safe-area-inset-*, css): they are the truth, the plugin only fills in when they are missing
+      const st0 = document.documentElement.style;
+      if (getComputedStyle(document.documentElement).getPropertyValue("--safe-area-inset-top").trim() !== "") { for (const k of ["--sat", "--sab", "--sal", "--sar"]) st0.removeProperty(k); return; }
       if (edge === null) edge = Math.abs(screen.height - innerHeight) < (i.top + i.bottom) / 2 + 1; // page reaches under the bars?
       const st = document.documentElement.style;
       for (const [k, v] of [["--sat", i.top], ["--sab", i.bottom], ["--sal", i.left], ["--sar", i.right]]) st.setProperty(k, (edge ? v : 0) + "px");
