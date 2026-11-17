@@ -35,7 +35,7 @@ ErrorDocument 504 /errors/504.html
   # CSP also as a header for the app page: there frame-ancestors works (a <meta> ignores it). Keep it the same as the
   # <meta> in index.html (without the desktop app: scheme). Not on the error pages: they have small inline scripts of their own
   <Files "index.html">
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https:; font-src 'self' data:; worker-src 'self' blob:; manifest-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://player.twitch.tv https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: blob:; media-src 'self' https: blob:; connect-src 'self' https:; font-src 'self' data:; worker-src 'self' blob:; manifest-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://player.twitch.tv https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com https://widget.deezer.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
   </Files>
   # nothing the site does not use: no camera, microphone, location, payments; motion sensors only for the glass tilt
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(self), gyroscope=(self)"

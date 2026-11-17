@@ -87,6 +87,8 @@ export async function index(el) {
       ${row("#/settings/notifs", "bell", "Сповіщення")}
       ${row("#/settings/media", "media", "Вміст і медіа")}
       ${row("#/settings/appearance", "brush", "Оформлення")}
+      ${row("#/settings/analytics", "media", "📊 Аналітика")}
+      ${row("#/tools", "media", "🧰 Інструменти: аналітика, статистика, синхронізація")}
       ${row("#/settings/a11y", "a11y", "Доступність")}
       ${row("#/settings/langs", "globe", "Мови")}
       ${row("#/settings/help", "help", "Довідка")}
@@ -440,6 +442,7 @@ export async function media(el) {
       ${toggle("autogif", "Автоматично відтворювати GIF", store.get("skybee.autogif") === "1")}
       <label class="field">Ключ Tenor API — для пошуку GIF<input id="tenorkey" autocomplete="off" spellcheck="false" placeholder="AIza…" value="${esc(store.get("skybee.tenorKey") || "")}"></label>
       <p class="small muted">Безплатний: Google Cloud Console → новий проєкт → увімкнути «Tenor API» → «Облікові дані» → «Створити ключ API». Зберігається лише на цьому пристрої.</p>
+      ${toggle("sbbadge", "Значок Skybee біля мого імені", store.get("skybee.badge") === "1", "Інші користувачі Skybee бачать біля вашого імені нашу бджолу (у вашому репозиторії зберігається позначка). Вимкнете — позначку буде прибрано")}
       ${toggle("postcolors", "Кольори профілів на постах", store.get("skybee.postColors") !== "0", "Пости людей з оформленням Skybee — на м'якому градієнті їхнього профілю")}
       <p class="small muted">🔒 Оформлення Skybee безпечне для твоєї IP-адреси: чужі записи читаються через публічний кеш, а іграшка — з CDN, тож сервер власника профілю тебе не бачить.</p>
       ${toggle("players", "Вбудовані плеєри", store.get("skybee.players") !== "0", "YouTube, Spotify, SoundCloud, Vimeo, Twitch, Apple Music грають прямо в пості — після натискання ▶")}
@@ -455,6 +458,7 @@ export async function media(el) {
   };
   $("#autogif", el).onchange = (e) => { store.set("skybee.autogif", e.target.checked ? "1" : null); toast("Збережено"); };
   $("#tenorkey", el).onchange = (e) => { store.set("skybee.tenorKey", e.target.value.trim() || null); toast(e.target.value.trim() ? "Ключ збережено — шукай GIF кнопкою «GIF» у редакторі" : "Ключ прибрано"); };
+  $("#sbbadge", el).onchange = async (e) => { store.set("skybee.badge", e.target.checked ? "1" : "0"); toast("Збережено"); (await import("./flair.js")).syncBadge(); };
   $("#postcolors", el).onchange = (e) => { store.set("skybee.postColors", e.target.checked ? null : "0"); toast("Збережено — діє на нових екранах"); };
   $("#players", el).onchange = (e) => { store.set("skybee.players", e.target.checked ? null : "0"); toast("Збережено"); };
   $("#extmedia", el).onchange = (e) => { store.set("skybee.noLinkThumbs", e.target.checked ? null : "1"); document.body.classList.toggle("nolinkthumbs", !e.target.checked); toast("Збережено"); };
@@ -619,6 +623,34 @@ export async function langs(el) {
     store.set("skybee.contentLangs", JSON.stringify([...el.querySelectorAll("[data-cl]:checked")].map(x => x.dataset.cl)));
     toast("Збережено");
   });
+}
+
+/* ================= ANALYTICS ================= */
+// Own numbers come from Skybee's tools (computed on the device); the network-wide numbers and the bot check are bskycheck.com,
+// an independent free service (not Bluesky). Its pages open in the app's own browser window.
+const BSC = "https://bskycheck.com/";
+export async function analytics(el) {
+  el.innerHTML = header("Аналітика", true) + `
+    <div class="sgroup">
+      ${row("#/tools/stats", "media", "📊 Статистика мого профілю: лайки, активність, найкращі пости")}
+      ${row("#/tools/follows", "users", "👥 Підписки: хто не підписаний у відповідь, хто відписався")}
+      ${row("#/settings/blocked-by", "shield", "⛔ Хто мене заблокував")}
+    </div>
+    <div class="card"><h3>Bluesky загалом — bskycheck</h3>
+      <p class="small muted">Незалежний безкоштовний сервіс (не Bluesky): живі дані з відкритого потоку Bluesky. Сторінки відкриваються у вікні застосунку.</p>
+      <div class="col" style="gap:8px">
+        <a class="btn ghost" href="${BSC}stats.php" target="_blank" rel="noopener">📈 Кількість користувачів і ріст</a>
+        <a class="btn ghost" href="${BSC}jazco.php" target="_blank" rel="noopener">🆕 Реєстрації та пости за сьогодні</a>
+        <a class="btn ghost" href="${BSC}bots.php" target="_blank" rel="noopener">🤖 Ботоактивність у мережі</a>
+      </div></div>
+    <div class="card"><h3>Перевірка акаунта на бота</h3>
+      <p class="small muted">Нік скопіюється, а на сторінці bskycheck його лишається вставити (3 перевірки на день без входу).</p>
+      <div class="row" style="gap:8px"><input id="botq" class="grow" placeholder="нік.bsky.social" maxlength="253" autocomplete="off" value="${esc(api.session?.handle || "")}"><button class="btn" id="botgo">Перевірити</button></div></div>`;
+  $("#botgo", el).onclick = async () => {
+    const h = $("#botq", el).value.trim().replace(/^@/, "");
+    try { await navigator.clipboard.writeText(h); toast("Нік скопійовано — вставте його на сторінці"); } catch {}
+    window.open(BSC + "botcheck.php", "_blank", "noopener,noreferrer");
+  };
 }
 
 /* ================= HELP ================= */

@@ -12,6 +12,7 @@ import * as flair from "./flair.js";
 import * as D from "./deck.js";
 import * as N from "./newbie.js";
 import * as X from "./extras.js";
+import * as TL from "./tools.js";
 import * as U from "./updates.js";
 import { bee, isLive, $, esc, calmMotion, posts, actors, pwa, toast, menu, closeMenu, confirmBox, modal, lightbox, attachVideo, webUrl, avatar, name, actionsBar, gateLine, hiddenReplies, at, num, ico } from "./ui.js";
 import { openComposer, openGateEditor } from "./compose.js";
@@ -484,9 +485,10 @@ async function route() {
     else if (seg[0] === "list") r = V.list(main, { uri: seg[1] });
     else if (seg[0] === "bookmarks") r = V.bookmarks(main);
     else if (seg[0] === "newcomers") r = N.newcomers(main);
+    else if (seg[0] === "tools") r = seg[1] === "follows" ? TL.followsReport(main) : seg[1] === "stats" ? TL.statsReport(main) : TL.tools(main);
     else if (seg[0] === "settings") r = ({
       words: V.mutedWords, content: M.contentFilters, passwords: M.appPasswords, account: S.account, accounts: S.accounts, privacy: S.privacy,
-      moderation: S.moderation, notifs: S.notifications, media: S.media, appearance: S.appearance, a11y: S.a11y, langs: S.langs, help: S.help, about: S.about,
+      analytics: S.analytics, moderation: S.moderation, notifs: S.notifications, media: S.media, appearance: S.appearance, a11y: S.a11y, langs: S.langs, help: S.help, about: S.about,
     }[seg[1]] || (seg[1] === "mutes" || seg[1] === "blocks" ? (m) => V.modList(m, { kind: seg[1] }) : seg[1] === "blocked-by" ? V.blockedBy : S.index))(main);
     else if (seg[0] === "profile" && seg[2] === "post" && seg[4]) r = V.postUsers(main, { actor: seg[1], rkey: seg[3], kind: seg[4] });
     else if (seg[0] === "profile" && seg[2] === "post") r = V.thread(main, { actor: seg[1], rkey: seg[3], read: "read" in q });
@@ -1337,6 +1339,7 @@ function boot() {
         if (location.hash.startsWith("#/newcomers")) $('nav.side [data-nav="#/newcomers"]').classList.add("on");
       }
     }).catch(() => {});
+  flair.askBadge().then(() => flair.syncBadge()).catch(() => {}); // asked once; the marker «this is a Skybee user» in the own record
   const sp = $("#sideProf"); if (sp) flair.paint(sp, api.session.did); // own Skybee colour on the profile card
   setTimeout(() => U.autoCheck().catch(() => {}), 5000); // phones: a new version (or beta build) to download?
 }

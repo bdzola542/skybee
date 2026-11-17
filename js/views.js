@@ -479,6 +479,7 @@ export const renderListCard = (l) => `<div class="actor" data-href="#/list/${enc
 
 export async function follows(el, { actor, kind }) {
   el.innerHTML = header({ followers: "Читачі", follows: "Підписки", known: "Спільні читачі" }[kind], true);
+  X.attachFilter(el, "Пошук серед завантажених");
   return paged(el, async (cursor) => {
     const d = await api.get({ followers: "app.bsky.graph.getFollowers", follows: "app.bsky.graph.getFollows", known: "app.bsky.graph.getKnownFollowers" }[kind], { actor, limit: 50, cursor });
     return { html: (d.followers || d.follows).map(a => renderActor(a)), cursor: d.cursor };

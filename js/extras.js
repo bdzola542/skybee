@@ -18,7 +18,7 @@ export function attachFilter(el, placeholder = "Пошук у цьому спи�
   const input = wrap.firstElementChild;
   const apply = () => {
     const q = input.value.trim().toLowerCase(), words = q ? q.split(/\s+/) : [];
-    el.querySelectorAll("article.post[data-uri]").forEach(a => {
+    el.querySelectorAll("article.post[data-uri], .actor:not(article .actor)").forEach(a => {
       const t = a.textContent.toLowerCase();
       a.hidden = words.length > 0 && !words.every(w => t.includes(w));
     });

@@ -318,6 +318,8 @@ export function playerOf(uri) {
     return { height: ["track", "episode"].includes(m[1]) ? 152 : 352, src: `https://open.spotify.com/embed/${m[1]}/${m[2]}` };
   if (h === "soundcloud.com" && path.split("/").filter(Boolean).length >= 2)
     return { height: path.includes("/sets/") ? 300 : 166, src: `https://w.soundcloud.com/player/?url=${encodeURIComponent(u.origin + path)}&auto_play=true&visual=false` };
+  if (h === "deezer.com" && (m = path.match(/^\/(?:[a-z]{2}\/)?(track|album|playlist)\/(\d+)/)))
+    return { height: m[1] === "track" ? 150 : 350, src: `https://widget.deezer.com/widget/auto/${m[1]}/${m[2]}` };
   if (u.hostname === "music.apple.com" && /\/(album|playlist|song)\//.test(path))
     return { height: u.searchParams.get("i") || path.includes("/song/") ? 175 : 450, src: `https://embed.music.apple.com${path}${u.search}` };
   return null;

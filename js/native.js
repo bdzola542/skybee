@@ -27,7 +27,13 @@ if (isNative) {
   }
   // Links to other sites open in the phone's browser: the shell sends any navigation away from the app there,
   // but a WebView ignores target=_blank and window.open — so turn those into a plain navigation.
-  const open = (url) => { if (/^https?:/i.test(url)) location.href = url; };
+  // …in the app's own browser window (Safari View Controller / Chrome Custom Tab: it slides over Skybee and «Готово» returns),
+  // not out in another app; without the plugin — as before
+  const open = (url) => {
+    if (!/^https?:/i.test(url)) return;
+    const B = cap.Plugins?.Browser;
+    if (B?.open) B.open({ url, presentationStyle: "popover" }).catch(() => { location.href = url; }); else location.href = url;
+  };
   window.open = (url) => { open(String(url || "")); return null; };
   document.addEventListener("click", (e) => {
     const a = e.target.closest?.('a[target="_blank"]');

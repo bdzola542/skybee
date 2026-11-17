@@ -4,7 +4,7 @@
 import { errText } from "./errors.js";
 import { t } from "./i18n.js";
 import * as api from "./api.js";
-import { esc, modal, toast, confirmBox, playerOf } from "./ui.js";
+import { esc, modal, toast, confirmBox, playerOf, bee } from "./ui.js";
 import * as saw from "./stars.js";
 
 export const NSID = "io.github.vysocavnu.skybee.profile";
@@ -47,6 +47,7 @@ function clean(v) {
   if (isColor(v.color)) out.color = v.color.toLowerCase();
   if (out.color && isColor(v.color2)) out.color2 = v.color2.toLowerCase();
   if (out.color2 && isColor(v.color3)) out.color3 = v.color3.toLowerCase();
+  if (v.app === "skybee") out.app = true; // marker: this person uses Skybee (the bee next to their name)
   if (out.color && v.flow === false) out.flow = false; // the owner stopped the flowing
   if (v.music && isHttps(v.music.url) && cut(v.music.title, 120)) {
     out.music = { url: v.music.url, title: cut(v.music.title, 120), artist: cut(v.music.artist, 120) };
@@ -102,20 +103,47 @@ const trackCard = (m, cls = "") => `<div class="sb-music ${cls}">
   ${m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy">` : `<span class="sb-note">🎵</span>`}
   <a class="grow sb-song" href="${esc(m.url)}" target="_blank" rel="noopener" data-title="${esc(m.title)}" data-artist="${esc(m.artist || "")}" title="Слухати в стрімінговому сервісі"><b class="clip">${esc(m.title)}</b><span class="muted small clip">${esc(m.artist || "Музика")}</span></a>
   ${m.preview ? `<button type="button" class="sb-play" data-preview="${esc(m.preview)}" title="Послухати уривок">▶</button>` : `<a class="sb-play" href="${esc(m.url)}" target="_blank" rel="noopener" title="Слухати">▶</a>`}</div>`;
-// A tap on the song itself (not on ▶): which service to listen in. Each opens a search for «artist title», so it works with any track
+// A tap on the song itself (not on ▶): which service to listen in. The song is looked up on every service (song.link),
+// and each one plays RIGHT HERE in the official embedded player (Spotify, Apple Music, YouTube, Deezer); ↗ opens the service
+// in the app's own browser window. If song.link knows nothing, each service gets a search for «artist title».
+const PLATFORMS = [["spotify", "Spotify"], ["appleMusic", "Apple Music"], ["youtubeMusic", "YouTube Music"], ["deezer", "Deezer"]];
+async function platformLinks(url) {
+  try {
+    if (!isHttps(url)) return null;
+    const r = await fetch(`https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(url)}`);
+    if (!r.ok) return null;
+    const by = (await r.json()).linksByPlatform || {}, out = {};
+    for (const [k] of PLATFORMS) if (by[k]?.url && isHttps(by[k].url)) out[k] = by[k].url;
+    if (!out.youtubeMusic && by.youtube?.url && isHttps(by.youtube.url)) out.youtubeMusic = by.youtube.url;
+    return Object.keys(out).length ? out : null;
+  } catch { return null; }
+}
 function streamPicker(title, artist, url) {
-  // an Apple Music track plays right here (the official embedded player; closing the window stops it)
-  const pl = url && /^https:\/\/music\.apple\.com\//.test(url) ? playerOf(url) : null;
   const q = encodeURIComponent(`${artist} ${title}`.trim());
-  const S = [["Spotify", `https://open.spotify.com/search/${q}`], ...(pl ? [] : [["Apple Music", `https://music.apple.com/search?term=${q}`]]),
-    ["YouTube Music", `https://music.youtube.com/search?q=${q}`], ["Deezer", `https://www.deezer.com/search/${q}`]];
+  const search = { spotify: `https://open.spotify.com/search/${q}`, appleMusic: `https://music.apple.com/search?term=${q}`,
+    youtubeMusic: `https://music.youtube.com/search?q=${q}`, deezer: `https://www.deezer.com/search/${q}` };
   stopAudio();
-  const m = modal(`<h3>${pl ? "Слухати в Apple Music" : "Слухати в…"}</h3><p class="muted small noi18n">${esc(artist ? artist + " — " : "")}${esc(title)}</p>
-    ${pl ? `<iframe class="sb-embed" src="${esc(pl.src)}" style="width:100%;height:min(${pl.height}px,45vh);border:0;border-radius:12px;margin:4px 0 10px" allow="autoplay; encrypted-media; fullscreen; clipboard-write" referrerpolicy="strict-origin-when-cross-origin" loading="lazy" title="Apple Music"></iframe><p class="muted small">Без підписки Apple Music грає уривок; з підпискою — увійдіть у плеєрі, і він грає повністю.</p>` : ""}
-    <div style="display:flex;flex-direction:column;gap:8px">${S.map(([n, u]) => `<a class="btn ghost" href="${esc(u)}" target="_blank" rel="noopener">${n}</a>`).join("")}
-    ${url ? `<a class="ghost small" href="${esc(url)}" target="_blank" rel="noopener">Відкрити за посиланням профілю</a>` : ""}</div>
+  const m = modal(`<h3>Слухати в…</h3><p class="muted small noi18n">${esc(artist ? artist + " — " : "")}${esc(title)}</p>
+    <div data-embed></div>
+    <div data-links style="display:flex;flex-direction:column;gap:8px"><span class="muted small">Шукаю пісню в сервісах…</span></div>
     <div class="row end"><button class="ghost" data-x="0">Закрити</button></div>`);
-  m.addEventListener("click", (e) => { if (e.target.closest("[data-x], a")) m.close(); });
+  const embed = m.querySelector("[data-embed]"), box = m.querySelector("[data-links]");
+  const draw = (links) => {
+    box.innerHTML = PLATFORMS.map(([k, n]) => {
+      const u = links?.[k] || search[k], exact = !!links?.[k];
+      return `<div class="row" style="gap:6px"><button class="btn ghost grow" data-play="${esc(u)}" data-exact="${exact ? 1 : 0}">${exact ? "▶ " : ""}${n}</button><a class="ghost icon" href="${esc(u)}" target="_blank" rel="noopener" title="Відкрити в сервісі" data-ext>↗</a></div>`;
+    }).join("");
+  };
+  draw(null);
+  platformLinks(url).then(l => { if (m.isConnected && l) draw(l); }).catch(() => {});
+  m.addEventListener("click", (e) => {
+    if (e.target.closest("[data-x]")) return m.close();
+    const b = e.target.closest("[data-play]");
+    if (!b) return;
+    const pl = b.dataset.exact === "1" ? playerOf(b.dataset.play) : null;
+    if (!pl) return void window.open(b.dataset.play, "_blank", "noopener,noreferrer"); // no embedded player for it: the app's browser window
+    embed.innerHTML = `<iframe class="sb-embed" src="${esc(pl.src)}" style="width:100%;height:${pl.video ? "min(220px,35vh)" : `min(${pl.height}px,45vh)`};border:0;border-radius:12px;margin:4px 0 10px" allow="autoplay; encrypted-media; fullscreen; clipboard-write" referrerpolicy="strict-origin-when-cross-origin" loading="lazy" title="${esc(b.textContent.trim())}"></iframe>`;
+  });
 }
 document.addEventListener("click", (e) => {
   const a = e.target.closest(".sb-music:not(.flat) a.sb-song");
@@ -171,19 +199,55 @@ export function untint(el) {
 /* ---------- the author's colours on their posts, in every feed ----------
    Each new post on screen asks for its author's Skybee look (once per person, cached); the post gets a calm wash of the
    gradient. Off in Налаштування → Вміст і медіа («Кольори профілів на постах»). */
+// the bee next to the name of everyone who uses Skybee (their record carries the marker); «Значок Skybee» in the settings switches it off
+export const badgeOn = () => { try { return localStorage.getItem("skybee.badge") !== "0"; } catch { return true; } }; // show the bee of others
+// the marker in the OWN record is written only after the owner said yes (skybee.badge = "1"); asked once
+const ownBadge = () => { try { return localStorage.getItem("skybee.badge") === "1"; } catch { return false; } };
+export async function askBadge() {
+  let v = null; try { v = localStorage.getItem("skybee.badge"); } catch {}
+  if (v != null || !api.session) return;
+  const yes = await confirmBox("Показувати біля вашого імені нашу бджолу 🐝, щоб інші користувачі Skybee вас впізнавали? Для цього в вашому акаунті Bluesky зберігається маленька позначка. Змінити можна в Налаштування → Вміст і медіа.", "Так, показувати");
+  try { localStorage.setItem("skybee.badge", yes ? "1" : "0"); } catch {}
+  syncBadge();
+}
+function addBadge(a) {
+  const host = a && (a.tagName === "H1" ? a : a.parentElement);
+  if (!a || !badgeOn() || host.querySelector(".sb-badge")) return;
+  a.insertAdjacentHTML(a.tagName === "H1" ? "beforeend" : "afterend", `<span class="sb-badge" title="${esc(t("Користувач Skybee"))}">${bee(14)}</span>`);
+}
+// own record: put the marker (once per account) or take it off when the badge is switched off
+export async function syncBadge() {
+  const did = api.session?.did; if (!did) return;
+  try {
+    // only «no record» means an empty look; any other failure (network, 5xx) must not overwrite the status, colour and track
+    const r = await api.get("com.atproto.repo.getRecord", { repo: did, collection: NSID, rkey: "self" }).catch((e) => { if (e?.code === "RecordNotFound") return null; throw e; });
+    const cur = r?.value || null, has = cur?.app === "skybee";
+    if (ownBadge() === has || (!ownBadge() && !has)) return;
+    const record = { ...(cur || { $type: NSID }), updatedAt: new Date().toISOString() };
+    if (ownBadge()) record.app = "skybee"; else delete record.app;
+    const empty = Object.keys(record).every(k => k === "$type" || k === "updatedAt");
+    if (!ownBadge() && empty) await api.post("com.atproto.repo.deleteRecord", { repo: did, collection: NSID, rkey: "self" });
+    else await api.post("com.atproto.repo.putRecord", { repo: did, collection: NSID, rkey: "self", record, validate: false });
+    cache.delete(did);
+  } catch { /* offline or no rights: next start */ }
+}
 export const postColorsOn = () => { try { return localStorage.getItem("skybee.postColors") !== "0"; } catch { return true; } };
 function tintPost(art) {
   art.dataset.sbp = "1";
   const did = (art.dataset.uri || "").split("/")[2];
   if (!did?.startsWith("did:")) return;
-  load(did).then((got) => { const c = colorsOf(got?.rec); if (c && art.isConnected) putColors(art, c, got.rec.flow === false, "sb-post"); });
+  load(did).then((got) => {
+    if (!art.isConnected || !got) return;
+    const c = postColorsOn() ? colorsOf(got.rec) : null; if (c) putColors(art, c, got.rec.flow === false, "sb-post");
+    if (got.rec.app) addBadge(art.querySelector(".meta > a:first-child, .who > a:first-child"));
+  });
 }
 if (typeof MutationObserver !== "undefined") {
   // only the nodes that just arrived are looked at (the whole page grew with every scroll: quadratic over a long feed)
   let queued = false, fresh = [];
   const scan = () => {
     queued = false; const nodes = fresh; fresh = [];
-    if (!postColorsOn() || !api.session) return;
+    if (!api.session) return;
     for (const n of nodes) {
       if (!n.isConnected) continue;
       if (n.matches("article.post[data-uri]:not([data-sbp])")) tintPost(n);
@@ -203,6 +267,7 @@ export async function decorate(el, p) {
   const got = await load(p.did);
   if (!got || !head?.isConnected) return; // nothing to show, or the user has already left the page
   const { rec, pds } = got;
+  if (rec.app) addBadge(head.querySelector("h1"));
   const banner = el.querySelector(".banner");
   const cs = colorsOf(rec);
   if (cs && cs[1] === cs[0]) cs[1] = partner(cs[0]);
@@ -228,11 +293,33 @@ export async function decorate(el, p) {
 /* ---------- music search ---------- */
 // The iTunes catalogue needs no key, allows reading from any site (CORS) and gives a 30-second preview.
 // (There used to be a JSONP fallback: it ran a script from Apple inside Skybee, which a Content-Security-Policy forbids.)
+// the Apple Music storefront of the reader: from the browser language (uk-UA → ua), else Ukraine
+const storefront = () => { const r = (navigator.language || "").split("-")[1]; return /^[A-Za-z]{2}$/.test(r || "") ? r.toLowerCase() : "ua"; };
+const toTrack = (t) => ({ url: t.trackViewUrl, title: cut(t.trackName, 120), artist: cut(t.artistName, 120),
+  cover: media((t.artworkUrl100 || "").replace("100x100", "300x300")), preview: media(t.previewUrl) });
+// the Apple Music chart of the storefront (shown before anything is typed): the chart lists songs, iTunes gives each its preview
+async function chartTracks() {
+  const cc = storefront();
+  for (const c of [cc, "us"]) {
+    try {
+      const r = await fetch(`https://rss.applemarketingtools.com/api/v2/${c}/music/most-played/25/songs.json`);
+      if (!r.ok) continue;
+      const ids = ((await r.json()).feed?.results || []).map(x => x.id).filter(id => /^\d{3,15}$/.test(id));
+      if (!ids.length) continue;
+      const l = await fetch(`https://itunes.apple.com/lookup?id=${ids.join(",")}&country=${c}`);
+      if (!l.ok) continue;
+      const by = new Map(((await l.json()).results || []).filter(t => t.trackName && isHttps(t.trackViewUrl)).map(t => [String(t.trackId), toTrack(t)]));
+      const out = ids.map(id => by.get(id)).filter(Boolean);
+      if (out.length) return out;
+    } catch { /* the next storefront */ }
+  }
+  return [];
+}
 async function searchTracks(term) {
   // Apple first (covers + 30-second previews); if it cannot be reached from here (CORS, a blocked host) → MusicBrainz, an open catalogue without a key
   // (no preview, the cover comes from the Cover Art Archive)
   try {
-    const r = await fetch(`https://itunes.apple.com/search?media=music&entity=song&limit=25&term=${encodeURIComponent(term)}`);
+    const r = await fetch(`https://itunes.apple.com/search?media=music&entity=song&limit=25&country=${storefront()}&term=${encodeURIComponent(term)}`);
     if (!r.ok) throw new Error("http " + r.status);
     const d = await r.json();
     return (d.results || []).filter(t => t.trackName && isHttps(t.trackViewUrl)).map(t => ({
@@ -302,14 +389,16 @@ function pickTrack() {
     q.focus();
     const run = async () => {
       const term = q.value.trim(), my = ++seq;
-      if (term.length < 2) return;
-      box.innerHTML = `<p class="muted small">Шукаю…</p>`;
+      if (term.length < 2 && term.length) return;
+      box.innerHTML = `<p class="muted small">${term ? "Шукаю…" : "Чарт Apple Music…"}</p>`;
       try {
-        if (isHttps(term)) { const t = await lookupTrack(term); list = t ? [t] : []; }
+        if (!term) list = await chartTracks();
+        else if (isHttps(term)) { const t = await lookupTrack(term); list = t ? [t] : []; }
         else list = await searchTracks(term);
         if (my !== seq) return; // a newer search is already running
         box.innerHTML = list.length ? list.map((t, i) => `<div class="sb-pick" data-i="${i}">${trackCard(t, "flat")}<div class="saw-line" data-saw="${i}"></div></div>`).join("")
           : `<p class="muted small">Нічого не знайдено</p>`;
+        if (!term && list.length) box.insertAdjacentHTML("afterbegin", `<p class="muted small">🔥 Популярне в Apple Music</p>`);
         // under each track: the position of every artist on the war (starsaboutwar.in.ua)
         list.forEach((t, i) => saw.check(t.artist).then((res) => {
           t.saw = res; const el = box.querySelector(`[data-saw="${i}"]`);
@@ -317,6 +406,7 @@ function pickTrack() {
         }).catch(() => { const el = box.querySelector(`[data-saw="${i}"]`); if (el) el.innerHTML = `<span class="muted small">Не вдалося перевірити виконавця</span>`; }));
       } catch (ex) { if (my === seq) box.innerHTML = `<p class="err">${esc(errText(ex))}</p>`; }
     };
+    setTimeout(run, 0); // before anything is typed: the Apple Music chart
     q.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 400); });
     q.addEventListener("keydown", (e) => { if (e.key === "Enter") { clearTimeout(timer); run(); } });
     box.addEventListener("click", async (e) => {
@@ -409,6 +499,7 @@ export async function edit(onDone) {
     x.disabled = true; x.textContent = "Збереження…";
     try {
       const record = { $type: NSID, updatedAt: new Date().toISOString() };
+      if (ownBadge()) record.app = "skybee";
       const status = cut(f("status").value, STATUS_MAX);
       if (status) record.status = status;
       if (isColor(c1)) {
