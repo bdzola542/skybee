@@ -676,7 +676,13 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
     return m.type === "childList" && [...m.addedNodes].some(n => n.nodeType === 1 && (n.matches(ROW) || n.querySelector?.(ROW)));
   });
   new MutationObserver((list) => { if (touches(list)) soon(); }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
-  new MutationObserver(soon).observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-ui"] }); // html: tab-min, font size, style
+  // html: font size, style, theme. Not the scroll classes (tab-min, scrolled, fab-min, feeds-hide) and not --gx/--gy (the tilt of the phone
+  // rewrites them ~60 times a second): re-measuring every row on each of those made the bubbles lag
+  const root = document.documentElement; let sig = "";
+  new MutationObserver(() => {
+    const s = root.className.replace(/\b(tab-min|scrolled|fab-min|feeds-hide)\b/g, "") + "|" + root.dataset.ui + "|" + (root.getAttribute("style") || "").replace(/--g[xy]:[^;]*;?/g, "") + "|" + root.dataset.theme + "|" + root.dataset.glass;
+    if (s !== sig) { sig = s; soon(); }
+  }).observe(root, { attributes: true, attributeFilter: ["class", "style", "data-ui", "data-theme", "data-glass"] });
   new MutationObserver(soon).observe(document.body, { attributes: true, attributeFilter: ["class"] }); // body: the side pane (tablets), the drawer
   addEventListener("change", soon); addEventListener("resize", soon); document.fonts?.ready.then(soon).catch(() => {});
 
