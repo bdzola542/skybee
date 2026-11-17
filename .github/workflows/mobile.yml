@@ -48,7 +48,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: Вебчастина й проєкт Android
         run: |
           npm run web
@@ -159,7 +159,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
-      - run: npm ci
+      - run: npm install --no-audit --no-fund
       - name: Вебчастина й проєкт iOS
         run: |
           npm run web
