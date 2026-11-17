@@ -47,6 +47,11 @@
     <color type="primary" scheme_preference="dark">#0f1218</color>
   </branding>
   <releases>
+    <release version="0.4.1" date="2026-11-17">
+      <description>
+        <p>Cleaner settings: emoji removed from settings and tools, icons only.</p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-11-16">
       <description>
         <p>Feed tabs hide while reading, instant switching between feeds, groups of people in notifications, platform icon sets, six more interface languages, feed looks (compact, mosaic), privacy for other people's profile looks, music search fallback.</p>

@@ -2,7 +2,7 @@
 // follow analytics (who does not follow back, who unfollowed), profile statistics, finding friends from a pasted list,
 // list export / import, settings synced through the own account.
 import * as api from "./api.js";
-import { esc, modal, toast, avatar, name, at, spinner, confirmBox } from "./ui.js";
+import { esc, modal, toast, avatar, name, at, spinner, confirmBox, ico } from "./ui.js";
 import { header } from "./views.js";
 import { errText } from "./errors.js";
 import { locale } from "./i18n.js";
@@ -30,19 +30,20 @@ async function profilesOf(names) {
 const validHandle = (h) => h.length <= 253 && /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$/.test(h);
 
 /* ---------- the index ---------- */
+const si = (n) => `<span class="sicon">${ico(n)}</span>`;
 export async function tools(el) {
-  el.innerHTML = header("🧰 Інструменти", true) + `<div class="sgroup">
-    <a class="srow" href="#/tools/follows"><span class="grow">👥 Аналітика підписок: хто не підписаний у відповідь, хто відписався</span></a>
-    <a class="srow" href="#/tools/stats"><span class="grow">📊 Статистика мого профілю</span></a>
-    <button class="srow" data-t="friends"><span class="grow">🔎 Знайти знайомих зі списку (X, Mastodon…)</span></button>
-    <button class="srow" data-t="sync"><span class="grow">☁️ Налаштування Skybee між пристроями</span></button></div>
+  el.innerHTML = header("Інструменти", true) + `<div class="sgroup">
+    <a class="srow" href="#/tools/follows">${si("users")}<span class="grow">Аналітика підписок: хто не підписаний у відповідь, хто відписався</span></a>
+    <a class="srow" href="#/tools/stats">${si("media")}<span class="grow">Статистика мого профілю</span></a>
+    <button class="srow" data-t="friends">${si("search")}<span class="grow">Знайти знайомих зі списку (X, Mastodon…)</span></button>
+    <button class="srow" data-t="sync">${si("globe")}<span class="grow">Налаштування Skybee між пристроями</span></button></div>
     <p class="muted small pad">Усе рахується на вашому пристрої з даних Bluesky, стороннім серверам нічого не надсилається.</p>`;
   el.onclick = (e) => { const b = e.target.closest("[data-t]"); if (b?.dataset.t === "friends") findFriends(); if (b?.dataset.t === "sync") syncDialog(); };
 }
 
 /* ---------- follow analytics ---------- */
 export async function followsReport(el) {
-  el.innerHTML = header("👥 Підписки", true) + spinner();
+  el.innerHTML = header("Підписки", true) + spinner();
   const me = api.session.did;
   const [follows, followers] = await Promise.all([allPages("app.bsky.graph.getFollows", { actor: me }, "follows"), allPages("app.bsky.graph.getFollowers", { actor: me }, "followers")]);
   const fing = new Set(follows.map(a => a.did)), fers = new Set(followers.map(a => a.did));
@@ -71,7 +72,7 @@ export async function followsReport(el) {
       || `<p class="muted pad">Тут нікого${tab === "gone" && !prev ? ". Знімок читачів збережено — наступного разу побачите, хто відписався" : ""}</p>`;
     el.querySelectorAll("[data-tab]").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
   };
-  el.innerHTML = header("👥 Підписки", true) + `<div class="tabs" style="flex-wrap:wrap">${Object.entries(names).map(([k, v]) => `<button data-tab="${k}">${esc(v)}</button>`).join("")}</div>
+  el.innerHTML = header("Підписки", true) + `<div class="tabs" style="flex-wrap:wrap">${Object.entries(names).map(([k, v]) => `<button data-tab="${k}">${esc(v)}</button>`).join("")}</div>
     <div data-list></div>`;
   draw();
   el.onclick = async (e) => {
@@ -85,7 +86,7 @@ export async function followsReport(el) {
 
 /* ---------- profile statistics (from the latest posts) ---------- */
 export async function statsReport(el) {
-  el.innerHTML = header("📊 Статистика", true) + spinner();
+  el.innerHTML = header("Статистика", true) + spinner();
   const me = api.session.did;
   const profile = await api.get("app.bsky.actor.getProfile", { actor: me });
   const posts = [];
@@ -131,7 +132,7 @@ export async function statsReport(el) {
       ${cntHour.some(Boolean) ? `<p class="muted small">Найкраща година для постів: <b>${String(bestH).padStart(2, "0")}:00</b> (за середніми реакціями на пост).</p>` : ""}</div>
     <div class="card pad"><b>Що ви публікуєте</b><p class="small">Текст ${kind.text} · фото ${kind.image} · відео ${kind.video} · посилання ${kind.link} · цитати ${kind.quote}</p>
       ${topTags.length ? `<p class="small">Теги: ${topTags.map(([t, c]) => `<a href="#/tag/${encodeURIComponent(t)}">#${esc(t)}</a> ×${c}`).join(" · ")}</p>` : ""}</div>`;
-  el.innerHTML = header("📊 Статистика", true) + `<div class="card pad">
+  el.innerHTML = header("Статистика", true) + `<div class="card pad">
     <p><b>${(profile.followersCount ?? 0).toLocaleString(locale)}</b> читачів · <b>${(profile.followsCount ?? 0).toLocaleString(locale)}</b> підписок · <b>${(profile.postsCount ?? 0).toLocaleString(locale)}</b> постів</p>
     <p class="muted small">За останні ${posts.length} постів (без відповідей і поширень):</p>
     <p>♥ ${sum("likeCount").toLocaleString(locale)} (у середньому ${(sum("likeCount") / n).toFixed(1)}) · 🔁 ${sum("repostCount").toLocaleString(locale)} (${(sum("repostCount") / n).toFixed(1)}) · 💬 ${sum("replyCount").toLocaleString(locale)} (${(sum("replyCount") / n).toFixed(1)}) · цитат ${sum("quoteCount").toLocaleString(locale)}</p></div>
@@ -151,7 +152,7 @@ function candidates(token, guess = true) {
   return [];
 }
 export function findFriends() {
-  const m = modal(`<h3>🔎 Знайти знайомих</h3><p class="muted small">Вставте імена людей (по одному в рядку чи через кому): нікнейми з X, адреси Mastodon (user@instance), домени Bluesky. Skybee перевірить, хто з них є в Bluesky.</p>
+  const m = modal(`<h3>Знайти знайомих</h3><p class="muted small">Вставте імена людей (по одному в рядку чи через кому): нікнейми з X, адреси Mastodon (user@instance), домени Bluesky. Skybee перевірить, хто з них є в Bluesky.</p>
     <textarea data-ta rows="6" maxlength="20000" placeholder="@name&#10;user@mastodon.social&#10;someone.com"></textarea><div data-res></div><p class="err"></p>
     <div class="row between"><button class="ghost" data-x="0">Закрити</button><button class="btn" data-x="1">Знайти</button></div>`);
   const res = m.querySelector("[data-res]"), err = m.querySelector(".err");
@@ -181,8 +182,8 @@ export function findFriends() {
 const NS = "io.github.vysocavnu.skybee.settings";
 const KEYS = ["theme", "color", "ui", "glass", "glassFloat", "lgTilt", "lgRefract", "intro", "mTonal", "mLabels", "mRipple", "font", "lang", "ui.lang", "tlang", "contentLangs", "requireAlt", "calm", "autogif", "players", "postColors", "badge", "hotkeys", "feedLook"];
 export function syncDialog() {
-  const m = modal(`<h3>☁️ Налаштування між пристроями</h3><p class="muted small">Зберігає вигляд і мови Skybee в одному записі вашого акаунта Bluesky (паролів і токенів там немає, але запис публічний: його може побачити будь-хто). На іншому пристрої натисніть «Завантажити».</p><p class="err"></p>
-    <div class="row between"><button class="btn" data-x="up">⬆️ Зберегти в акаунт</button><button class="btn ghost" data-x="down">⬇️ Завантажити з акаунта</button></div>
+  const m = modal(`<h3>Налаштування між пристроями</h3><p class="muted small">Зберігає вигляд і мови Skybee в одному записі вашого акаунта Bluesky (паролів і токенів там немає, але запис публічний: його може побачити будь-хто). На іншому пристрої натисніть «Завантажити».</p><p class="err"></p>
+    <div class="row between"><button class="btn" data-x="up">Зберегти в акаунт</button><button class="btn ghost" data-x="down">Завантажити з акаунта</button></div>
     <div class="row end"><button class="ghost" data-x="0">Закрити</button></div>`);
   const err = m.querySelector(".err");
   m.addEventListener("click", async (e) => {
@@ -194,7 +195,7 @@ export function syncDialog() {
         const data = {};
         for (const k of KEYS) { const v = localStorage.getItem("skybee." + k); if (v != null && v.length <= 200) data[k] = v; }
         await api.post("com.atproto.repo.putRecord", { repo: api.session.did, collection: NS, rkey: "self", record: { $type: NS, updatedAt: new Date().toISOString(), data }, validate: false });
-        toast("Збережено в акаунті ☁️"); m.close();
+        toast("Збережено в акаунті"); m.close();
       } else {
         const r = await api.get("com.atproto.repo.getRecord", { repo: api.session.did, collection: NS, rkey: "self" }).catch(() => null);
         const data = r?.value?.data;
@@ -227,7 +228,7 @@ export async function exportList(uri) {
   toast(`Експортовано: ${items.length}`);
 }
 export function importToList(uri, onDone) {
-  const m = modal(`<h3>⬆️ Імпорт у список</h3><p class="muted small">Вставте нікнейми або адреси (по одному в рядку, чи CSV із колонкою handle). До 200 за раз.</p>
+  const m = modal(`<h3>Імпорт у список</h3><p class="muted small">Вставте нікнейми або адреси (по одному в рядку, чи CSV із колонкою handle). До 200 за раз.</p>
     <textarea rows="7" data-ta maxlength="30000" placeholder="name.bsky.social&#10;someone.com"></textarea><p class="err"></p>
     <div class="row between"><button class="ghost" data-x="0">Скасувати</button><button class="btn" data-x="1">Додати</button></div>`);
   m.addEventListener("click", async (e) => {
