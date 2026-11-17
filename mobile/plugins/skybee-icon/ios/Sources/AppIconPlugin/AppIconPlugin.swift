@@ -13,7 +13,7 @@ public class AppIconPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func change(_ call: CAPPluginCall) {
         let name = call.getString("name") ?? "gold"
-        guard name == "gold" || name.range(of: "^[0-9a-f]{6}$", options: .regularExpression) != nil else {
+        guard name.range(of: "^(gold|[0-9a-f]{6})(-dim|-dark)?$", options: .regularExpression) != nil else {
             call.reject("bad icon name")
             return
         }

@@ -29,7 +29,7 @@ function visibleAccent(c, theme) {
 import * as flair from "./flair.js";
 import { statusBarFor, isNative } from "./native.js";
 import * as upd from "./updates.js";
-import { iconColor, setIconColor, beeSvg, svgUrl, ICON_COLORS } from "./appicon.js";
+import { iconColor, setIconColor, iconBg, setIconBg, beeSvg, svgUrl, ICON_COLORS } from "./appicon.js";
 
 const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
@@ -512,14 +512,14 @@ export function applyLook() {
 export async function appearance(el) {
   const draw = () => {
     const theme = store.get("skybee.theme") || "dark", font = store.get("skybee.font") || "15", color = isHex(appColor()) ? appColor() : "";
-    const icolor = iconColor(), uiPick = store.get("skybee.ui") || "auto", ui = uiStyle();
+    const icolor = iconColor(), ibg = iconBg(), uiPick = store.get("skybee.ui") || "auto", ui = uiStyle();
     el.innerHTML = header("Оформлення", true) + `
       <div class="card"><h3>Тема</h3>${seg("th", [["system", "Як у системі"], ["dark", "Темна"], ["dim", "Сутінки"], ["light", "Світла"]], theme)}</div>
       <div class="card"><h3>Колір</h3><p class="muted small">Колір кнопок, перемикачів, позначок і активної вкладки — замість золотого.</p><div class="sb-swatches app">${
         [["", "Золотий — як у бджілки"], ...APP_COLORS].map(([c, n]) => `<button type="button" class="sb-sw${c ? "" : " none"}${c === color ? " on" : ""}" data-color="${c}" title="${n}" aria-label="${n}"${c ? ` style="background:${c}"` : ""}>${c ? "" : bee(18)}</button>`).join("")}<label class="sb-sw sb-any${color && !APP_COLORS.some(([c]) => c === color) ? " on" : ""}" title="Свій колір"${color && !APP_COLORS.some(([c]) => c === color) ? ` style="--own:${color}"` : ""}><input type="color" data-anycolor value="${isHex(color) ? color : "#ff4d4d"}"><b>+</b></label></div>
         <p class="muted small">${!color ? "Золотий — як у бджілки" : APP_COLORS.find(([c]) => c === color)?.[1] || `Свій колір ${color}`}</p></div>
       <div class="card"><h3>Іконка застосунку</h3><p class="muted small">Кольори ті самі, що й для кнопок. На сайті — бджола без фону у вкладці; на комп'ютері — значок вікна й трею; на телефоні — значок на екрані з готових кольорів.</p>
-        <div class="sb-icons">${[["", "Золота — як є"], ...APP_COLORS.filter(([c]) => !isNative || ICON_COLORS.includes(c))].map(([c, n]) => `<button type="button" class="sb-ic${c === icolor ? " on" : ""}" data-icon="${c}" title="${n}" aria-label="${n}"><img alt="" src="${svgUrl(beeSvg(c, true))}"></button>`).join("")}${isNative ? "" : `<label class="sb-ic sb-any${icolor && !APP_COLORS.some(([c]) => c === icolor) ? " on" : ""}" title="Свій колір"><input type="color" data-anyicon value="${icolor || "#ff4d4d"}">${icolor && !APP_COLORS.some(([c]) => c === icolor) ? `<img alt="" src="${svgUrl(beeSvg(icolor, true))}">` : "<b>+</b>"}</label>`}</div></div>
+        ${seg("ibg", [["", "Світла"], ["dim", "Сутінки"], ["dark", "Темна"]], ibg)}<div class="sb-icons">${[["", "Золота — як є"], ...APP_COLORS.filter(([c]) => !isNative || ICON_COLORS.includes(c))].map(([c, n]) => `<button type="button" class="sb-ic${c === icolor ? " on" : ""}" data-icon="${c}" title="${n}" aria-label="${n}"><img alt="" src="${svgUrl(beeSvg(c, true, 112, ibg))}"></button>`).join("")}${isNative ? "" : `<label class="sb-ic sb-any${icolor && !APP_COLORS.some(([c]) => c === icolor) ? " on" : ""}" title="Свій колір"><input type="color" data-anyicon value="${icolor || "#ff4d4d"}">${icolor && !APP_COLORS.some(([c]) => c === icolor) ? `<img alt="" src="${svgUrl(beeSvg(icolor, true, 112, ibg))}">` : "<b>+</b>"}</label>`}</div></div>
       <div class="card"><h3>Вигляд стрічки</h3><p class="muted small">«Компактний» — багато постів на екрані, дрібні відступи й картинки. «Мозаїка» — режим сітки ▦ показує фото різної висоти, як Pinterest.</p>
         ${seg("fl", [["", "Звичайний"], ["compact", "Компактний"], ["mosaic", "Мозаїка"]], store.get("skybee.feedLook") || "")}</div>
       <div class="card"><h3>Розмір тексту</h3>${seg("font", [["14", "Менший"], ["15", "Звичайний"], ["17", "Більший"], ["19", "Великий"]], font)}</div>
@@ -547,6 +547,7 @@ export async function appearance(el) {
     const any = el.querySelector("[data-anycolor]");
     any.oninput = () => { store.set(colorKey(), any.value.toLowerCase()); applyLook(); }; // live while the picker is open
     any.onchange = () => { store.set(colorKey(), any.value.toLowerCase()); applyLook(); draw(); };
+    el.querySelectorAll("[data-ibg]").forEach(b => b.onclick = () => { setIconBg(b.dataset.ibg); draw(); });
     el.querySelectorAll("[data-icon]").forEach(b => b.onclick = () => { setIconColor(b.dataset.icon); draw(); });
     const anyI = el.querySelector("[data-anyicon]");
     if (anyI) anyI.onchange = () => { setIconColor(anyI.value); draw(); };

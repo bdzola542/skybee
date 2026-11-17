@@ -14,10 +14,10 @@ import org.json.JSONException;
 // name = "gold" або hex без # ("4a8cff"); all — усі імена, що є в збірці.
 @CapacitorPlugin(name = "AppIcon")
 public class AppIconPlugin extends Plugin {
-    private static final Pattern OK = Pattern.compile("^(gold|[0-9a-f]{6})$");
+    private static final Pattern OK = Pattern.compile("^(gold|[0-9a-f]{6})(-dim|-dark)?$");
 
     private static String alias(String name) {
-        return ".Icon" + (name.equals("gold") ? "Gold" : "C" + name);
+        return ".Icon" + (name.equals("gold") ? "Gold" : "C" + name.replace("-", "_"));
     }
 
     @PluginMethod
