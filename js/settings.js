@@ -73,7 +73,7 @@ export async function index(el) {
       <span class="grow"><b>${name(p)}</b><small class="muted">${at(a.handle)}</small></span><span class="acc-n" data-n="${esc(a.did)}"></span></button>`;
   };
   el.innerHTML = header("Налаштування", false,
-    `<button class="ghost icon" data-act="shareMe" title="QR-код і посилання на мій профіль">${ico("qr", 20)}</button><button class="ghost sm" data-act="editProfile">Змінити</button>`) + `
+    `<button class="ghost icon" data-act="shareMe" title="QR-код і посилання на мій профіль">${ico("qr", 20)}</button><button class="ghost icon" data-act="editProfile" title="Змінити профіль" aria-label="Змінити профіль">${ico("pen", 20)}</button>`) + `
     <a class="shead" href="#/profile/${encodeURIComponent(session.handle)}">${head(me)}</a>
     <div class="sgroup accs">
       ${others.map(acc).join("")}

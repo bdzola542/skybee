@@ -1308,7 +1308,7 @@ nav.bottom a:hover { text-decoration: none; }
 .row > :is(input, select) + :is(.btn, .ghost, button) { flex: none; white-space: nowrap; }
 /* «Колонки» on a phone: the density button is just its icon, so the title fits */
 @media (max-width: 640px) { [data-d="density"] .dl { display: none; } }
-@media (max-width: 640px) { :root[data-ui="glass"] .seg > *, :root[data-ui="material"] .seg > * { font-size: .9em; } }
+@media (max-width: 640px) { :root[data-ui="glass"] .seg > *, :root[data-ui="material"] .seg > * { font-size: clamp(11.5px, 3.3vw, 14px); } }
 .sp-btns > * { white-space: nowrap; min-width: 0; padding-left: 8px; padding-right: 8px; font-size: 13px; }
 .sfeed { display: flex; align-items: center; gap: 10px; } .sfeed .ico { flex: none; color: var(--muted); } .sfeed.on .ico { color: var(--accent-mark); }
 /* file pickers (banner, avatar, toy, list image): the system control styled like the app's buttons */
@@ -1879,8 +1879,9 @@ body:has(main:is([data-route^="/settings"], [data-route^="/myfeeds/"], [data-rou
 @media (max-width: 480px) { .accrow { flex-wrap: nowrap; } }
 /* segmented controls on a phone (and with big text): equal parts, labels on two lines rather than «Як у сист…» */
 @media (max-width: 480px) {
-  .seg > * { flex: 1 1 0; min-width: 4.5em; white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
-    line-height: 1.2; padding-left: 6px; padding-right: 6px; overflow-wrap: break-word; hyphens: auto; }
+  /* a label breaks only between words, never inside one («Звичай-ний»): the type shrinks a little instead */
+  .seg > * { flex: 1 1 0; min-width: 0; white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+    line-height: 1.2; padding-left: 4px; padding-right: 4px; overflow-wrap: normal; hyphens: none; font-size: clamp(11.5px, 3.3vw, 14px); }
 }
 /* the photo viewer is always on the dark backdrop (glass and Material put it on a white card in the light theme) */
 :root[data-ui] .modal-bg.dark > .modal { background: none !important; border: 0 !important; box-shadow: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
