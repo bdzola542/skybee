@@ -171,7 +171,21 @@ export function linkify(s) {
     return m;
   });
 }
-export function richText(text = "", facets) {
+// «23:00 UTC» → also in the reader's own time
+function localTimes(html) {
+  // only the text between tags (never inside <a href="…"> or any attribute), and not inside links
+  let inA = false;
+  return html.split(/(<[^>]+>)/).map(part => {
+    if (part[0] === "<") { if (/^<a[\s>]/i.test(part)) inA = true; else if (/^<\/a>/i.test(part)) inA = false; return part; }
+    if (inA) return part;
+    return part.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\s?(UTC|GMT)\b/g, (all, h, m) => {
+      const d = new Date(); d.setUTCHours(+h, +m, 0, 0);
+      return `${all} <span class="ltime">(у вас ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})</span>`;
+    });
+  }).join("");
+}
+export const richText = (text = "", facets) => localTimes(richTextRaw(text, facets));
+function richTextRaw(text = "", facets) {
   if (!facets?.length) return linkify(text);
   const bytes = te.encode(text);
   let out = "", pos = 0;
@@ -304,6 +318,8 @@ export function playerOf(uri) {
     return { height: ["track", "episode"].includes(m[1]) ? 152 : 352, src: `https://open.spotify.com/embed/${m[1]}/${m[2]}` };
   if (h === "soundcloud.com" && path.split("/").filter(Boolean).length >= 2)
     return { height: path.includes("/sets/") ? 300 : 166, src: `https://w.soundcloud.com/player/?url=${encodeURIComponent(u.origin + path)}&auto_play=true&visual=false` };
+  if (h === "deezer.com" && (m = path.match(/^\/(?:[a-z]{2}\/)?(track|album|playlist)\/(\d+)/)))
+    return { height: m[1] === "track" ? 150 : 350, src: `https://widget.deezer.com/widget/auto/${m[1]}/${m[2]}` };
   if (u.hostname === "music.apple.com" && /\/(album|playlist|song)\//.test(path))
     return { height: u.searchParams.get("i") || path.includes("/song/") ? 175 : 450, src: `https://embed.music.apple.com${path}${u.search}` };
   return null;

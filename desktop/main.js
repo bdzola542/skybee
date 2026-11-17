@@ -219,7 +219,28 @@ ipcMain.handle("skybee:icon", (_e, png) => {
   return true;
 });
 ipcMain.handle("skybee:version", () => app.getVersion());
-const external = (url) => { if (/^(https?|mailto):/i.test(url)) shell.openExternal(url); };
+// Links to other sites open in a window of Skybee itself (a sandboxed page without access to the app), not in the system browser;
+// only mailto: goes to the mail program
+let extWin = null;
+const external = (url) => {
+  if (/^mailto:/i.test(url)) return void shell.openExternal(url);
+  if (/^http:\/\//i.test(url)) return void shell.openExternal(url); // plain http is not shown in the app window
+  if (!/^https:\/\//i.test(url)) return;
+  if (extWin && !extWin.isDestroyed()) { extWin.loadURL(url).catch(() => {}); extWin.show(); return; }
+  extWin = new BrowserWindow({ width: 1100, height: 800, parent: win && !win.isDestroyed() ? win : undefined, autoHideMenuBar: true, title: "Skybee",
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, partition: "skybee-ext", webSecurity: true } });
+  extWin.setMenuBarVisibility(false);
+  // no address bar: the host of the page is always in the title, so it cannot pass for a part of Skybee
+  const host = (u) => { try { return new URL(u).hostname; } catch { return ""; } };
+  extWin.webContents.on("page-title-updated", (e) => { e.preventDefault(); extWin.setTitle(`${host(extWin.webContents.getURL())} — Skybee`); });
+  extWin.webContents.on("did-navigate", (_e, u) => extWin.setTitle(`${host(u)} — Skybee`));
+  for (const ev of ["will-navigate", "will-redirect"]) extWin.webContents.on(ev, (e, u) => { if (!/^https:\/\//i.test(u)) e.preventDefault(); });
+  extWin.webContents.session.setPermissionCheckHandler(() => false);
+  extWin.webContents.setWindowOpenHandler(({ url: u }) => { if (/^https:\/\//i.test(u)) extWin.loadURL(u).catch(() => {}); return { action: "deny" }; });
+  extWin.webContents.session.setPermissionRequestHandler((_wc, _perm, cb) => cb(false)); // a site there gets no camera, microphone, notifications…
+  extWin.on("closed", () => { extWin = null; });
+  extWin.loadURL(url).catch(() => {});
+};
 
 /* ---------- skybee:// links ----------
    Sign-up happens in the browser; when it is done, the page there opens skybee://login?handle=… and the OS hands it

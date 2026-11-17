@@ -6,6 +6,9 @@
 <meta name="theme-color" content="#0f1218">
 <meta name="description" content="Skybee — безкоштовний відкритий клієнт для Bluesky українською: колонки, власні стрічки, чати, теми Liquid Glass і Material. Вебверсія, Windows, Linux, Android та iPhone.">
 <link rel="canonical" href="https://skybee.online/">
+<link rel="alternate" hreflang="uk" href="https://skybee.online/bluesky-klient/">
+<link rel="alternate" hreflang="en" href="https://skybee.online/bluesky-client/">
+<link rel="alternate" hreflang="x-default" href="https://skybee.online/">
 <!-- a link to the site shared in Telegram, Discord, Bluesky, X: the title, the text and the picture -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Skybee">
@@ -24,12 +27,12 @@
 <!-- Захист від чужих скриптів: навіть якщо десь у рендері знайдеться дірка, вставлений код не виконається.
      Скрипти — лише власні (hls.js — копія в js/vendor/). На телефонах (mobile/www) політику вмикає
      js/native.js одразу після старту (scripts/dist.mjs): Capacitor на Android спершу вставляє свій міст вбудованим скриптом. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' app:; style-src 'self' app: 'unsafe-inline'; img-src 'self' app: https: data: blob:; media-src 'self' app: https: blob:; connect-src 'self' app: https:; font-src 'self' app: data:; worker-src 'self' blob:; manifest-src 'self' app:; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://player.twitch.tv https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com; object-src 'none'; base-uri 'self'; form-action 'self'">
-<title>Skybee — відкритий клієнт Bluesky: колонки, власні стрічки, теми</title>
-<link rel="icon" href="icons/favicon.svg?v=2" type="image/svg+xml">
-<link rel="icon" href="favicon.ico?v=2" sizes="16x16 32x32">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' app:; style-src 'self' app: 'unsafe-inline'; img-src 'self' app: https: data: blob:; media-src 'self' app: https: blob:; connect-src 'self' app: https:; font-src 'self' app: data:; worker-src 'self' blob:; manifest-src 'self' app:; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://player.twitch.tv https://open.spotify.com https://w.soundcloud.com https://embed.music.apple.com https://widget.deezer.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+<title>Skybee — клієнт для Bluesky (Bluesky client): колонки, власні стрічки, чати</title>
+<link rel="icon" href="icons/favicon.svg?v=3" type="image/svg+xml">
+<link rel="icon" href="favicon.ico?v=3" sizes="16x16 32x32">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=2">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=3">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Skybee">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -44,6 +47,7 @@
 </filter></svg>
 <div id="app"><div class="sentinel"><div class="spinner"></div></div></div>
 <noscript><main class="pad">
+  <p><a href="bluesky-klient/">Skybee — клієнт для Bluesky українською</a> · <a href="bluesky-client/">Skybee — a free open-source Bluesky client</a></p>
   <h1>Skybee — відкритий клієнт для Bluesky</h1>
   <p>Безкоштовний клієнт соцмережі Bluesky українською: колонки поруч, власні стрічки без сервера, чати, сповіщення, теми Liquid Glass і Material, оформлення профілю.</p>
   <p>Працює у браузері, а також як застосунок для Windows, Linux, Android та iPhone — <a href="https://github.com/vysocavnu/skybee/releases">завантажити</a>.</p>

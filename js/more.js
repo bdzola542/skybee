@@ -51,6 +51,8 @@ export async function listMenu(anchor, uri) {
   const web = `https://bsky.app/profile/${l.creator.handle}/lists/${uri.split("/").pop()}`;
   const c = await menu(anchor, [
     { act: "copy", label: "🔗 Копіювати посилання" },
+    { act: "export", label: "⬇️ Експорт учасників (CSV)" },
+    ...(mine ? [{ act: "import", label: "⬆️ Імпорт учасників…" }] : []),
     ...(mine ? [{ act: "edit", label: "✏️ Редагувати" }, { act: "delete", label: "🗑️ Видалити список", danger: true }] : []),
     ...(mod ? [
       { act: "mute", label: l.viewer?.muted ? "👁️ Більше не приховувати учасників" : "🙈 Приховати всіх учасників" },
@@ -59,6 +61,8 @@ export async function listMenu(anchor, uri) {
     ...(mine ? [] : [{ act: "report", label: "🚩 Поскаржитись", danger: true }]),
   ]);
   if (c === "copy") { await navigator.clipboard.writeText(web); toast("Скопійовано"); }
+  if (c === "export") { try { await (await import("./tools.js")).exportList(uri); } catch (ex) { toast(errText(ex)); } }
+  if (c === "import") (await import("./tools.js")).importToList(uri, reload);
   if (c === "edit") listDialog(l);
   if (c === "delete" && await confirmBox(`Видалити список «${l.name}»?`, "Видалити", true)) { await api.deleteList(uri); toast("Список видалено"); location.hash = "#/lists"; }
   if (c === "mute") { await api.muteList(uri, !l.viewer?.muted); toast("Готово"); reload(); }

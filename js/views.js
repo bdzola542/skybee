@@ -11,6 +11,7 @@ import {
 import * as notify from "./notify.js";
 import * as flair from "./flair.js";
 import * as src from "./sources.js";
+import * as X from "./extras.js";
 
 export const MENU_BTN = `<button class="ghost icon only-mobile" data-act="drawer" title="Меню">${ico("menu", 26)}</button>`; // phones: opens the side menu
 export const header = (title, back = false, right = "") =>
@@ -70,7 +71,8 @@ async function joinedFromLog(did) {
 // «Підписки» without replies / reposts / quotes, as chosen in the settings
 function homeFilter(d) {
   const v = api.pref("feedViewPref", "home");
-  d.feed = d.feed.filter(it => !(v.hideReplies && it.reply && !it.reason) && !(v.hideReposts && it.reason?.$type === "app.bsky.feed.defs#reasonRepost")
+  const hid = X.hiddenFromHome(); // followed, but kept out of «Підписки»
+  d.feed = d.feed.filter(it => !(hid.size && (hid.has(it.post?.author?.did) || hid.has(it.reason?.by?.did))) && !(v.hideReplies && it.reply && !it.reason) && !(v.hideReposts && it.reason?.$type === "app.bsky.feed.defs#reasonRepost")
     && !(v.hideQuotePosts && /app\.bsky\.embed\.record(WithMedia)?#view/.test(it.post?.embed?.$type || "")));
   return d;
 }
@@ -113,6 +115,7 @@ export const forgetHomeTabs = () => { tabsCache = null; };
 
 export async function home(el) {
   el.innerHTML = `<div class="topbar">${MENU_BTN}<h2 class="brand">${bee(28)} Skybee</h2><div class="grow"></div>${gridBtn("home")}</div><div class="tabs" id="feedTabs"></div><div id="feedBody"></div>`;
+  X.attachFilter(el, "Пошук у цьому фіді");
   const tabs = await homeTabs();
   let sel = 0; try { sel = Math.min(+sessionStorage.getItem("skybee.tab") || 0, tabs.length - 1); } catch {}
   const tabEl = $("#feedTabs", el), body = $("#feedBody", el);
@@ -230,6 +233,7 @@ export async function feed(el, { uri }) {
       <div class="col"><button class="btn sm" data-act="saveFeed" data-uri="${esc(uri)}">${g.viewer?.saved ? "Збережено ✓" : "Зберегти"}</button>
       <button class="ghost sm" data-act="likeFeed" data-uri="${esc(uri)}" data-cid="${esc(g.cid)}" data-like="${esc(g.viewer?.like || "")}">${g.viewer?.like ? "♥" : "♡"}</button></div>
     </div><div id="fbody"></div>`;
+  X.attachFilter(el, "Пошук у цьому фіді");
   const body = $("#fbody", el);
   let stop;
   const show = () => {
@@ -258,6 +262,7 @@ export async function list(el, { uri }) {
     </div>
     ${l.viewer?.muted ? `<p class="pad muted small">🙈 Ви приховали всіх учасників цього списку</p>` : ""}${l.viewer?.blocked ? `<p class="pad muted small">⛔ Ви заблокували всіх учасників цього списку</p>` : ""}
     <div class="tabs"><button class="on" data-lt="posts">Пости</button><button data-lt="people">Люди</button></div><div id="lb"></div>`;
+  X.attachFilter(el, "Пошук у цьому списку");
   let stop;
   const lb = $("#lb", el);
   const show = (which) => {
@@ -474,6 +479,7 @@ export const renderListCard = (l) => `<div class="actor" data-href="#/list/${enc
 
 export async function follows(el, { actor, kind }) {
   el.innerHTML = header({ followers: "Читачі", follows: "Підписки", known: "Спільні читачі" }[kind], true);
+  X.attachFilter(el, "Пошук серед завантажених");
   return paged(el, async (cursor) => {
     const d = await api.get({ followers: "app.bsky.graph.getFollowers", follows: "app.bsky.graph.getFollows", known: "app.bsky.graph.getKnownFollowers" }[kind], { actor, limit: 50, cursor });
     return { html: (d.followers || d.follows).map(a => renderActor(a)), cursor: d.cursor };
@@ -854,6 +860,18 @@ export async function feeds(el) {
 /* ================= BOOKMARKS ================= */
 export async function bookmarks(el) {
   el.innerHTML = header("Закладки");
+  X.attachFilter(el, "Пошук у закладках");
+  // folders (kept on this device): chips under the search, a post goes into a folder from its «⋯» menu
+  const names = Object.keys(X.folders());
+  let folder = "";
+  if (names.length) {
+    const chips = document.createElement("div"); chips.className = "chips pad";
+    chips.innerHTML = [["", "Усі"], ...names.map(n => [n, "📁 " + n])].map(([n, l]) => `<button class="chip${n ? "" : " on"}" data-f="${esc(n)}">${esc(l)}</button>`).join("");
+    el.querySelector(".lfilter-wrap").after(chips);
+    const apply = () => { const set = folder ? new Set(X.folders()[folder] || []) : null; el.querySelectorAll("article.post[data-uri]").forEach(a => a.classList.toggle("bm-out", !!set && !set.has(a.dataset.uri))); };
+    chips.addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; folder = b.dataset.f; chips.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c === b)); apply(); });
+    new MutationObserver(() => { if (folder) apply(); }).observe(el, { childList: true, subtree: true });
+  }
   return paged(el, async (cursor) => {
     const d = await api.get("app.bsky.bookmark.getBookmarks", { limit: 30, cursor });
     return { html: d.bookmarks.map(b => b.item?.$type === "app.bsky.feed.defs#postView" || b.item?.uri && b.item?.author ? renderPost(b.item) : `<div class="muted pad small">Пост недоступний</div>`), cursor: d.cursor };
@@ -862,21 +880,28 @@ export async function bookmarks(el) {
 
 /* ================= MESSAGES ================= */
 export async function messages(el, { requests = false } = {}) {
+  let showSpam = false; try { showSpam = sessionStorage.getItem("skybee.spamShown") === "1"; } catch {}
   el.innerHTML = header("Повідомлення", false, `<button class="ghost sm" data-act="newDm">✉️ Нове</button>`) +
     `<div class="tabs"><a href="#/messages" class="${requests ? "" : "on"}">Чати</a><a href="#/messages/requests" class="${requests ? "on" : ""}">Запити</a></div>`;
   try {
+    el._spam?.abort(); el._spam = new AbortController(); // the screen is reused: one listener only
+    el.addEventListener("click", (e) => { const sp = e.target.closest("[data-spam]"); if (sp?.dataset.spam === "off") { e.preventDefault(); X.setSpam(false); dispatchEvent(new HashChangeEvent("hashchange")); return; } if (sp) { e.preventDefault(); try { sessionStorage.setItem("skybee.spamShown", "1"); } catch {} dispatchEvent(new HashChangeEvent("hashchange")); } }, { signal: el._spam.signal });
     swipeChats(el, requests); // (the list box comes from paged just below; the swipe looks it up on touch)
     return paged(el, async (cursor) => {
       const d = await api.chat("chat.bsky.convo.listConvos", { limit: 30, cursor, status: requests ? "request" : "accepted" });
+      // requests that look like spam («Hi. How are you?», links to Telegram…) are folded away; a switch brings them back
+      let spam = 0;
+      if (requests && !showSpam) d.convos = d.convos.filter(c => { const bad = X.looksSpam(c.lastMessage?.text); if (bad) spam++; return !bad; });
+      const note = spam ? `<div class="muted small pad center">🚫 Схожих на спам запитів сховано: ${spam} · <a href="#" data-spam="1">показати</a> · <a href="#" data-spam="off">вимкнути фільтр</a></div>` : "";
       return {
-        html: d.convos.map(c => {
+        html: [...(note ? [note] : []), ...d.convos.map(c => {
           const other = c.members.find(m => m.did !== session.did) || c.members[0];
           const last = c.lastMessage;
           const txt = last?.$type === "chat.bsky.convo.defs#deletedMessageView" ? "Повідомлення видалено" : (last?.text || (last?.embed ? "📎 Пост" : ""));
           return `<div class="actor${c.unreadCount ? " unread" : ""}" data-href="#/messages/${c.id}">${avatar(other, 48)}
             <div class="who"><b>${name(other)}</b>${c.muted ? " 🔕" : ""}<span class="muted clip">${last?.sender?.did === session.did ? "Ви: " : ""}<span class="noi18n">${esc(txt)}</span></span></div>
             <div class="col end"><span class="muted small">${last ? ago(last.sentAt) : ""}</span>${c.unreadCount ? `<span class="badge">${c.unreadCount}</span>` : ""}</div></div>`;
-        }),
+        })],
         cursor: d.cursor,
       };
     });

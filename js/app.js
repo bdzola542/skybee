@@ -11,6 +11,8 @@ import * as notify from "./notify.js";
 import * as flair from "./flair.js";
 import * as D from "./deck.js";
 import * as N from "./newbie.js";
+import * as X from "./extras.js";
+import * as TL from "./tools.js";
 import * as U from "./updates.js";
 import { bee, isLive, $, esc, calmMotion, posts, actors, pwa, toast, menu, closeMenu, confirmBox, modal, lightbox, attachVideo, webUrl, avatar, name, actionsBar, gateLine, hiddenReplies, at, num, ico } from "./ui.js";
 import { openComposer, openGateEditor } from "./compose.js";
@@ -331,6 +333,17 @@ async function badges() {
 window.addEventListener("skybee:badge", badges);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) badges(); });
 
+// the browser translates on the device when it can; otherwise the post goes to Google Translate
+async function translatePost(p) {
+  const text = p.record?.text || "", lang = S.translateLang();
+  const google = `https://translate.google.com/?sl=auto&tl=${lang}&text=${encodeURIComponent(text)}`;
+  if (!("Translator" in self && "LanguageDetector" in self)) return void window.open(google, "_blank"); // at once, while the tap still counts (Safari blocks it after an await)
+  const out = await X.translateText(text, lang);
+  if (out == null) return void modal(`<h3>🌐 Переклад</h3><p>Браузер не зміг перекласти цей пост на місці.</p><p><a class="btn" href="${esc(google)}" target="_blank" rel="noopener">Відкрити в Google Translate</a></p>`);
+  modal(`<h3>🌐 Переклад</h3><div class="text noi18n" style="white-space:pre-wrap">${esc(out)}</div><div class="row end" style="margin-top:12px"><button class="btn" data-x>Закрити</button></div>`)
+    .addEventListener("click", (e) => { if (e.target.closest("[data-x]")) e.currentTarget.close?.(); });
+}
+
 /* ---------- router ---------- */
 /* ---------- screen transitions ----------
    Every screen arrives with the motion of the chosen interface style (css: main.nav-push / nav-pop / nav-tab):
@@ -472,9 +485,10 @@ async function route() {
     else if (seg[0] === "list") r = V.list(main, { uri: seg[1] });
     else if (seg[0] === "bookmarks") r = V.bookmarks(main);
     else if (seg[0] === "newcomers") r = N.newcomers(main);
+    else if (seg[0] === "tools") r = seg[1] === "follows" ? TL.followsReport(main) : seg[1] === "stats" ? TL.statsReport(main) : TL.tools(main);
     else if (seg[0] === "settings") r = ({
       words: V.mutedWords, content: M.contentFilters, passwords: M.appPasswords, account: S.account, accounts: S.accounts, privacy: S.privacy,
-      moderation: S.moderation, notifs: S.notifications, media: S.media, appearance: S.appearance, a11y: S.a11y, langs: S.langs, help: S.help, about: S.about,
+      analytics: S.analytics, moderation: S.moderation, notifs: S.notifications, media: S.media, appearance: S.appearance, a11y: S.a11y, langs: S.langs, help: S.help, about: S.about,
     }[seg[1]] || (seg[1] === "mutes" || seg[1] === "blocks" ? (m) => V.modList(m, { kind: seg[1] }) : seg[1] === "blocked-by" ? V.blockedBy : S.index))(main);
     else if (seg[0] === "profile" && seg[2] === "post" && seg[4]) r = V.postUsers(main, { actor: seg[1], rkey: seg[3], kind: seg[4] });
     else if (seg[0] === "profile" && seg[2] === "post") r = V.thread(main, { actor: seg[1], rkey: seg[3], read: "read" in q });
@@ -942,11 +956,11 @@ document.addEventListener("click", async (e) => {
         break;
       }
       case "bookmark": {
-        if (p.viewer?.bookmarked) { await api.unbookmark(p.uri); p.viewer.bookmarked = false; toast("Прибрано із закладок"); }
+        if (p.viewer?.bookmarked) { await api.unbookmark(p.uri); X.removeFromFolders(p.uri); p.viewer.bookmarked = false; toast("Прибрано із закладок"); }
         else { await api.bookmark(p); p.viewer = { ...(p.viewer || {}), bookmarked: true }; toast("Додано в закладки 🔖"); }
         refreshPostEl(p.uri); break;
       }
-      case "translate": window.open(`https://translate.google.com/?sl=auto&tl=${S.translateLang()}&text=${encodeURIComponent(p.record?.text || "")}`, "_blank"); break;
+      case "translate": translatePost(p); break;
       case "editGate": editGate(p); break;
       case "postMenu": {
         const mine = p.author.did === api.session.did, my = `at://${api.session.did}/`;
@@ -961,6 +975,8 @@ document.addEventListener("click", async (e) => {
           { act: "copyLink", label: "🔗 Копіювати посилання" },
           { act: "copySkybee", label: `${bee(18)} Посилання Skybee (відкривається й без входу)` },
           { act: "sendDm", label: "✉️ Надіслати в чат" },
+          ...(p.viewer?.bookmarked ? [{ act: "bmFolder", label: "📁 Закладки: у папку…" }] : []),
+          ...(!mine && p.author.viewer?.following ? [{ act: "hideFromHome", label: X.hiddenFromHome().has(p.author.did) ? "👁️ Знову показувати в «Підписках»" : `🙈 Приховати ${at(p.author.handle)} із «Підписок» (без відписки)` }] : []),
           { act: "muteThread", label: p.viewer?.threadMuted ? "🔔 Не приховувати гілку" : "🔕 Приховати гілку" },
           "-",
           // the thread's author may hide a reply for everyone, the author of a quoted post may detach the quote
@@ -996,7 +1012,7 @@ document.addEventListener("click", async (e) => {
           if (c === "less") { art.classList.add("fadeout"); setTimeout(() => art.remove(), 300); }
           toast(c === "more" ? `Фід «${gen.displayName}» показуватиме більше такого` : `Фід «${gen.displayName}» показуватиме менше такого`);
         }
-        if (c === "translate") window.open(`https://translate.google.com/?sl=auto&tl=${S.translateLang()}&text=${encodeURIComponent(p.record?.text || "")}`, "_blank");
+        if (c === "translate") translatePost(p);
         if (c === "copyText") { await navigator.clipboard.writeText(p.record?.text || ""); toast("Скопійовано"); }
         if (c === "copyLink") { await navigator.clipboard.writeText(webUrl(p)); toast("Посилання скопійовано"); }
         if (c === "copySkybee") { await navigator.clipboard.writeText(skybeeUrl(p)); toast("Посилання скопійовано"); }
@@ -1005,6 +1021,12 @@ document.addEventListener("click", async (e) => {
           await api.post(on ? "app.bsky.graph.muteThread" : "app.bsky.graph.unmuteThread", { root: rootUri || p.uri });
           p.viewer = { ...(p.viewer || {}), threadMuted: on }; toast(on ? "Гілку приховано: сповіщень із неї не буде" : "Гілку знову видно");
         }
+        if (c === "bmFolder") {
+          const have = Object.keys(X.folders());
+          const n = prompt("Назва папки закладок" + (have.length ? ` (є: ${have.join(", ")}; порожньо — прибрати з папок)` : ""), X.folderOf(p.uri)[0] || "");
+          if (n != null) { X.removeFromFolders(p.uri); if (n.trim()) { X.addToFolder(n, p.uri); toast("Додано в папку «" + n.trim().slice(0, 40) + "» 📁"); } else toast("Прибрано з папок"); }
+        }
+        if (c === "hideFromHome") { const on = X.toggleHiddenFromHome(p.author.did); toast(on ? "Більше не показуватиму в «Підписках» (підписку збережено)" : "Знову показуватиму в «Підписках»"); }
         if (c === "gate") editGate(p);
         if (c === "delete" && await confirmBox("Видалити цей пост назавжди?", "Видалити", true)) {
           await api.deletePost(p.uri); document.querySelectorAll(`[data-uri="${CSS.escape(p.uri)}"]`).forEach(x => x.remove()); toast("Пост видалено");
@@ -1317,6 +1339,7 @@ function boot() {
         if (location.hash.startsWith("#/newcomers")) $('nav.side [data-nav="#/newcomers"]').classList.add("on");
       }
     }).catch(() => {});
+  flair.askBadge().then(() => flair.syncBadge()).catch(() => {}); // asked once; the marker «this is a Skybee user» in the own record
   const sp = $("#sideProf"); if (sp) flair.paint(sp, api.session.did); // own Skybee colour on the profile card
   setTimeout(() => U.autoCheck().catch(() => {}), 5000); // phones: a new version (or beta build) to download?
 }
