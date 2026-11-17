@@ -11,7 +11,7 @@ name: Hosting (NIC.UA)
 on:
   push:
     branches: ["main"]
-    paths: ["index.html", "404.html", "offline.html", "favicon.ico", "manifest.webmanifest", "sw.js", "robots.txt", "sitemap.xml", "bluesky-klient/**", "bluesky-client/**",
+    paths: ["index.html", "404.html", "offline.html", "favicon.ico", "manifest.webmanifest", "sw.js", "robots.txt", "sitemap.xml", "googledeefdaeca8c9abe3.html", "bluesky-klient/**", "bluesky-client/**",
             "css/**", "js/**", "icons/**", "errors/**", "data/**", "hosting/**", ".github/workflows/hosting.yml"]
   workflow_run:
     workflows: ["Stars about war"] # він кладе дані в гілку stars-data, а не в main, тож push-тригер його не бачить
@@ -46,7 +46,7 @@ jobs:
         if: steps.cfg.outputs.ok == '1'
         run: |
           mkdir site
-          cp -r index.html 404.html offline.html favicon.ico manifest.webmanifest sw.js robots.txt sitemap.xml css js icons errors data bluesky-klient bluesky-client site/
+          cp -r index.html 404.html offline.html favicon.ico manifest.webmanifest sw.js robots.txt sitemap.xml googledeefdaeca8c9abe3.html css js icons errors data bluesky-klient bluesky-client site/
           # свіжі дані starsaboutwar (main захищений, тож stars.yml кладе їх у гілку stars-data); немає гілки — лишаються з main
           if git fetch --depth=1 origin stars-data 2>/dev/null && git show FETCH_HEAD:data/stars.json > "$RUNNER_TEMP/stars.json" \
              && node scripts/stars-check.mjs "$RUNNER_TEMP/stars.json"; then
