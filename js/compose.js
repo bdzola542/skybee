@@ -1,7 +1,8 @@
 // Skybee — post composer
 import { errText } from "./errors.js";
 import * as api from "./api.js";
-import { sortAZ } from "./i18n.js";
+import { sortAZ, locale } from "./i18n.js";
+import * as scheduler from "./push.js";
 import { esc, modal, toast, avatar, name, richText, spinner, at } from "./ui.js";
 
 const LANGS = sortAZ([["uk", "Українська"], ["en", "English"], ["pl", "Polski"], ["be", "Беларуская"], ["ru", "Русский"], ["de", "Deutsch"], ["cs", "Čeština"], ["es", "Español"], ["ja", "日本語"]]);
@@ -102,6 +103,31 @@ const draft = {
 };
 
 // opts: { replyTo: postView, quote: postView, text }
+// asks for the time of a scheduled post: resolves with a Date or null
+function pickTime() {
+  return new Promise((res) => {
+    const d = new Date(Date.now() + 3600e3); d.setMinutes(0, 0, 0);
+    const v = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    let done = false; const fin = (x) => { if (!done) { done = true; res(x); } };
+    const m = modal(`<h3>Запланувати пост</h3><p class="muted small">Сервер Skybee опублікує його сам, навіть коли застосунок закрито.</p>
+      <input type="datetime-local" value="${v}" data-when><p class="err"></p><div class="schedlist" data-sl></div>
+      <div class="row between"><button class="ghost" data-x="0">Скасувати</button><button class="btn" data-x="1">Запланувати</button></div>`, { onClose: () => fin(null) });
+    // already scheduled posts: shown here, each can be cancelled
+    const sl = m.querySelector("[data-sl]");
+    const draw = (items) => { sl.innerHTML = items.length ? `<p class="muted small">Уже заплановано:</p>` + items.map(i => `<div class="row between small"><span class="noi18n">${esc(new Date(i.at).toLocaleString(locale))} — ${esc(i.text.slice(0, 50))}</span><button class="ghost" data-del="${esc(i.id)}">✕</button></div>`).join("") : ""; };
+    scheduler.scheduled().then(draw).catch(() => {});
+    m.addEventListener("click", async (e) => {
+      const del = e.target.closest("[data-del]")?.dataset.del;
+      if (del) { try { await scheduler.unschedule(del); draw(await scheduler.scheduled()); } catch (ex) { m.querySelector(".err").textContent = errText(ex); } return; }
+      const x = e.target.closest("[data-x]")?.dataset.x; if (!x) return;
+      if (x === "0") return m.close();
+      const t = new Date(m.querySelector("[data-when]").value);
+      if (isNaN(t) || t.getTime() < Date.now() + 120e3) { m.querySelector(".err").textContent = "Обери час хоча б за 2 хвилини від зараз"; return; }
+      fin(t); m.close();
+    });
+  });
+}
+
 export function openComposer(opts = {}, onDone) {
   const { quote } = opts;
   let replyTo = opts.replyTo;
@@ -128,7 +154,7 @@ export function openComposer(opts = {}, onDone) {
     <div class="composer">
       <div class="row between">
         <button class="ghost" data-c="cancel">Скасувати</button>
-        <button class="btn" data-c="send"></button>
+        <span class="row" style="gap:6px"><button class="ghost" data-c="later" title="Запланувати пост" ${scheduler.canSchedule() ? "" : "hidden"}>🕒</button><button class="btn" data-c="send"></button></span>
       </div>
       ${replyTo ? `<div class="ctx">${avatar(replyTo.author, 28)}<div><b>${name(replyTo.author)}</b><div class="text small">${richText((replyTo.record?.text || "").slice(0, 300), replyTo.record?.facets)}</div></div></div>` : ""}
       <div class="parts" data-parts="before"></div>
@@ -318,6 +344,22 @@ export function openComposer(opts = {}, onDone) {
     if (c === "gate") {
       gateBox.hidden = !gateBox.hidden;
       gate ||= gateForm(gateBox.querySelector("[data-gateform]"), allow, v => { allow = v; gateBtn.textContent = gateLabel(v); });
+    }
+    if (c === "later" && !busy) {
+      const x = all().filter(filled);
+      if (x.length !== 1 || x[0].images.length || x[0].video || x[0].card) { err.textContent = "Планувати можна лише пост із текстом (без фото, відео й карток)"; return; }
+      const text = x[0].text.trim();
+      if (api.graphemes(text) > 300) { err.textContent = "Пост довший за 300 символів"; return; }
+      busy = true; send.disabled = true; // no second click (or «Надіслати») while the time is asked and the server answers
+      const when = await pickTime(); if (!when) { busy = null; send.disabled = false; return; }
+      try {
+        const rp = replyTo;
+        await scheduler.schedule({ text, facets: await api.detectFacets(text), langs: [m.querySelector("[data-lang]").value],
+          reply: rp ? { root: rp.record?.reply?.root || api.strongRef(rp), parent: api.strongRef(rp) } : undefined,
+          quote: quote ? api.strongRef(quote) : undefined, at: when });
+        if (plain) draft.set("");
+        m.close(); toast("Заплановано на " + new Date(when).toLocaleString(locale) + " 🐝");
+      } catch (ex) { err.textContent = ex.code === "full" ? "Забагато запланованих постів (до 20)" : ex.code === "time" ? "Час має бути від 2 хвилин до 90 днів уперед" : errText(ex); busy = null; send.disabled = false; }
     }
     if (c === "send" && !busy) {
       const queue = all().filter(filled);

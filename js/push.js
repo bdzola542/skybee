@@ -49,3 +49,13 @@ export async function disable() {
   setItem(key(), null);
   try { await (await (await ready()).pushManager.getSubscription())?.unsubscribe(); } catch {}
 }
+
+/* ---------- заплановані пости (той самий сервер: cron раз на хвилину публікує) ---------- */
+// лише текст (+ цитата чи відповідь); потрібне ввімкнене сповіщення: сервер тримає пароль застосунку й публікує від імені акаунта
+export const canSchedule = () => !!(api.session && getItem(key()));
+const auth = () => ({ did: api.session.did, token: getItem(key()) });
+export async function schedule({ text, facets, langs, reply, quote, at }) {
+  return call("sched_add", { ...auth(), text, facets, langs, reply, quote, at: new Date(at).toISOString() });
+}
+export async function scheduled() { return (await call("sched_list", auth())).items || []; }
+export async function unschedule(id) { return call("sched_del", { ...auth(), id }); }
