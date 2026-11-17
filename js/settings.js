@@ -679,13 +679,24 @@ const cap = () => window.Capacitor;
 
 // «Встановити як застосунок» on the site: pick a device, get the file from the newest GitHub release
 const RELEASES = "https://github.com/vysocavnu/skybee/releases/latest";
+// platform icons in the same line style as ico() (stroke = currentColor), instead of emoji
+const PI = {
+  windows: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M12 4v16M3 12h18"/>',
+  android: '<path d="M5 17v-5a7 7 0 0 1 14 0v5z"/><path d="M8 5.5L6.5 3.5M16 5.5l1.5-2"/><circle cx="9.5" cy="12" r=".6"/><circle cx="14.5" cy="12" r=".6"/><path d="M5 17h14v1.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5z"/>',
+  ios: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 5h3M11 18.5h2"/>',
+  appimage: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M7 9.5l3 2.5-3 2.5M12 15h5"/>',
+  flatpak: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
+  tar: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M12 3v2h-2v2h2v2h-2v2h2v2M10.5 15h3v3h-3z"/>',
+  web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+};
+const pIco = (k) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="width:26px;height:26px">${PI[k] || ""}</svg>`;
 const INSTALL = [
-  { id: "windows", icon: "🪟", name: "Windows", note: "Інсталятор .exe — оновлюється сам", re: /setup\.exe$/i },
-  { id: "android", icon: "🤖", name: "Android", note: "Файл APK — дозволь встановлення з браузера", re: /\.apk$/i },
-  { id: "ios", icon: "🍎", name: "iPhone / iPad", note: "IPA без підпису — встанови через Sideloadly чи AltStore", re: /\.ipa$/i },
-  { id: "appimage", icon: "🐧", name: "Linux — AppImage", note: "Один файл, оновлюється сам", re: /\.AppImage$/i },
-  { id: "flatpak", icon: "📦", name: "Linux — Flatpak", note: "flatpak remote-add --user skybee https://skybee.online/flatpak/skybee.flatpakrepo && flatpak install --user skybee io.github.vysocavnu.skybee", re: /\.flatpak$/i },
-  { id: "tar", icon: "🗜️", name: "Linux — tar.gz", note: "Архів, розпакуй і запусти skybee", re: /linux-x64\.tar\.gz$/i },
+  { id: "windows", name: "Windows", note: "Інсталятор .exe — оновлюється сам", re: /setup\.exe$/i },
+  { id: "android", name: "Android", note: "Файл APK — дозволь встановлення з браузера", re: /\.apk$/i },
+  { id: "ios", name: "iPhone / iPad", note: "IPA без підпису — встанови через Sideloadly чи AltStore", re: /\.ipa$/i },
+  { id: "appimage", name: "Linux — AppImage", note: "Один файл, оновлюється сам", re: /\.AppImage$/i },
+  { id: "flatpak", name: "Linux — Flatpak", note: "flatpak remote-add --user skybee https://skybee.online/flatpak/skybee.flatpakrepo && flatpak install --user skybee io.github.vysocavnu.skybee", re: /\.flatpak$/i },
+  { id: "tar", name: "Linux — tar.gz", note: "Архів, розпакуй і запусти skybee", re: /linux-x64\.tar\.gz$/i },
 ];
 let latestAssets = null; // cached for the session: [{name, browser_download_url}]
 function latestRelease() {
@@ -701,9 +712,9 @@ export function installDialog() {
   const list = [...INSTALL].sort((a, b) => (b.id === mine) - (a.id === mine));
   const m = modal(`<h3>Встановити Skybee</h3>
     <p class="small muted">Обери пристрій — завантажиться остання версія.</p>
-    ${pwa.install ? `<button class="instpick" data-pwa><span class="ii">🌐</span><span><b>У цьому браузері</b><small>Окреме вікно без завантаження файлів</small></span></button>` : ""}
+    ${pwa.install ? `<button class="instpick" data-pwa><span class="ii">${pIco("web")}</span><span><b>У цьому браузері</b><small>Окреме вікно без завантаження файлів</small></span></button>` : ""}
     ${list.map((o) => `<a class="instpick${o.id === mine ? " mine" : ""}" data-id="${o.id}" href="${RELEASES}" target="_blank" rel="noopener">
-      <span class="ii">${o.icon}</span><span><b>${esc(o.name)}${o.id === mine ? ' <i class="tag">цей пристрій</i>' : ""}</b><small>${esc(o.note)}</small></span></a>`).join("")}
+      <span class="ii">${pIco(o.id)}</span><span><b>${esc(o.name)}${o.id === mine ? ' <i class="tag">цей пристрій</i>' : ""}</b><small>${esc(o.note)}</small></span></a>`).join("")}
     ${/macintosh/i.test(ua) && here !== "ios" ? `<p class="small muted">Для Mac окремої версії ще немає — встанови Skybee як застосунок через браузер (Chrome, Edge або Safari: «Додати в Dock»).</p>` : ""}
     ${here === "ios" ? `<p class="small muted">Або без файлів: «Поділитися» → «На початковий екран» у Safari.</p>` : ""}
     <p class="small muted"><a href="${RELEASES}" target="_blank" rel="noopener">Усі файли й версії на GitHub</a></p>
