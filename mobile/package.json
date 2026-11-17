@@ -19,7 +19,7 @@
     "skybee-icon": "file:plugins/skybee-icon"
   },
   "devDependencies": {
-    "@capacitor/assets": "3.0.5",
+    "@capacitor/assets": "4.0.0",
     "sharp": "0.32.6"
   }
 }
