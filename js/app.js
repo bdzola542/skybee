@@ -363,7 +363,7 @@ function navKind(path) {
 }
 function playNav(main, kind) {
   main.classList.remove("nav-push", "nav-pop", "nav-tab");
-  if (kind === "none" || calmMotion()) return;
+  if (kind === "none" || calmMotion() || (kind === "pop" && document.documentElement.dataset.swiped)) return; // a swipe back has already moved the screen
   void main.offsetWidth; // restart the animation even when the kind is the same as last time
   main.classList.add("nav-" + kind);
   main.addEventListener("animationend", function end(e) { if (e.target === main) { main.classList.remove("nav-" + kind); main.removeEventListener("animationend", end); } });
@@ -626,8 +626,16 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
     if (a && a !== drag.cur) {
       drag.cur?.classList.remove("peek");
       drag.cur = a; a.classList.add("peek");
-      placeLens(a);
+      const lens = drag.bar.querySelector(".navlens");
+      if (lens) lens.style.width = a.offsetWidth - 6 + "px"; // the bubble takes the size of the tab under it
       navigator.vibrate?.(6);
+    }
+    // the bubble goes with the finger itself (not tab by tab), then settles under the tab on release
+    const lens = drag.bar.querySelector(".navlens");
+    if (lens) {
+      const b = drag.bar.getBoundingClientRect(), w = lens.offsetWidth;
+      const x = Math.max(3, Math.min(e.clientX - b.left - w / 2, b.width - w - 3));
+      lens._anim?.cancel(); lens.classList.remove("flow"); lens._x = x; lens.style.setProperty("--lx", x + "px");
     }
   }, { passive: true });
   const finish = () => {
@@ -697,7 +705,7 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
   addEventListener("skybee:rowdrag", (e) => {
     const { row, from, to, p, end } = e.detail, lens = row.querySelector(":scope > .rowlens");
     if (!lens) return;
-    if (end) { lens.style.transition = ""; lens._anim?.cancel(); place(row); return; } // a cancelled swipe: back under the chosen tab
+    if (end) { lens.style.transition = ""; lens._anim?.cancel(); place(row, e.detail.to != null ? row.querySelector(`[data-tab="${e.detail.to}"]`) : undefined); return; } // a cancelled swipe: back under the chosen tab
     const a = row.querySelector(`[data-tab="${from}"]`), b = row.querySelector(`[data-tab="${to}"]`);
     if (!a || !b) return;
     const inset = 6, x = a.offsetLeft + (b.offsetLeft - a.offsetLeft) * p + inset, w = a.offsetWidth + (b.offsetWidth - a.offsetWidth) * p - inset * 2;
@@ -726,8 +734,16 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
       if (dx < 10 || dx < dy * 1.5) return;
     }
     drag.moved = true; drag.row.classList.add("dragging");
-    const c = under(drag.row, e.clientX);
-    if (c && c !== drag.cur) { drag.cur?.classList.remove("peek"); drag.cur = c; c.classList.add("peek"); place(drag.row, c); navigator.vibrate?.(6); }
+    const c = under(drag.row, e.clientX), lens = drag.row.querySelector(":scope > .rowlens");
+    if (c && c !== drag.cur) {
+      drag.cur?.classList.remove("peek"); drag.cur = c; c.classList.add("peek"); navigator.vibrate?.(6);
+      if (lens) { lens.style.width = c.offsetWidth - (drag.row.classList.contains("tabs") ? 12 : 0) + "px"; }
+    }
+    if (lens) { // the bubble follows the finger smoothly; it settles under the item on release
+      const b = drag.row.getBoundingClientRect(), w = lens.offsetWidth;
+      const x = Math.max(0, Math.min(e.clientX - b.left - w / 2, drag.row.clientWidth - w));
+      lens._anim?.cancel(); lens.classList.remove("flow"); lens._x = x; lens.style.setProperty("--lx", x + "px");
+    }
   }, { passive: true });
   addEventListener("pointerup", () => end(true), { passive: true });
   addEventListener("pointercancel", () => end(false), { passive: true }); // the browser took the touch (the page scrolls): never a choice

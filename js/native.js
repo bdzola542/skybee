@@ -87,7 +87,16 @@ if (isNative || window.skybeeDesktop) {
   }, { passive: true });
   const end = () => {
     const goBack = on && dx >= GO;
-    if (goBack) { home(false); x0 = null; on = false; if (!closeTop() && history.length > 1 && !/^#?\/?$/.test(location.hash)) history.back(); }
+    if (goBack) {
+      // the screen finishes the way the finger was taking it (slides off to the right), then the previous one is simply there — no second animation on top
+      const t = el; el = null; x0 = null; on = false;
+      const go = () => {
+        const r = document.documentElement; r.dataset.swiped = "1"; clearTimeout(go.t); go.t = setTimeout(() => delete r.dataset.swiped, 700);
+        if (!closeTop() && history.length > 1 && !/^#?\/?$/.test(location.hash)) history.back();
+        if (t) setTimeout(() => { t.style.transition = t.style.transform = t.style.opacity = ""; }, 160);
+      };
+      if (t) { t.style.transition = "transform .17s cubic-bezier(.3,0,.8,.6), opacity .17s"; t.style.transform = "translateX(100%)"; t.style.opacity = ".4"; setTimeout(go, 170); } else go();
+    }
     else drop();
   };
   addEventListener("touchend", end, { passive: true });

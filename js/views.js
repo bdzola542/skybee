@@ -187,7 +187,7 @@ export async function home(el) {
       if (horiz === null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) horiz = Math.abs(dx) > Math.abs(dy) * 1.4;
       if (!horiz) return;
       const edge = (dx > 0 && sel === 0) || (dx < 0 && sel === tabs.length - 1);
-      look(edge ? dx * .15 : dx * .55, String(1 - Math.min(Math.abs(dx) / 700, .3)));
+      look(edge ? Math.sign(dx) * Math.sqrt(Math.abs(dx)) * 3 : dx * .8, String(1 - Math.min(Math.abs(dx) / 500, .45)));
       // the glass bubble in the tab row goes with the finger, between this feed's tab and the next one
       const to = edge ? sel : sel + (dx < 0 ? 1 : -1);
       window.dispatchEvent(new CustomEvent("skybee:rowdrag", { detail: { row: tabEl, from: sel, to, p: edge ? 0 : Math.min(Math.abs(dx) / 140, 1) } }));
@@ -196,16 +196,18 @@ export async function home(el) {
       if (x0 == null) return;
       x0 = null;
       if (!horiz) return;
-      window.dispatchEvent(new CustomEvent("skybee:rowdrag", { detail: { row: tabEl, end: true } }));
       const go = Math.abs(dx) > 70 ? sel + (dx < 0 ? 1 : -1) : sel;
-      if (go === sel || go < 0 || go >= tabs.length) return look(0, "", "transform .3s var(--ease-move, ease-out), opacity .22s");
-      const dir = dx < 0 ? -1 : 1;
-      look(dir * 140, "0", "transform .16s ease-in, opacity .16s");
+      // a swipe that switches the feed leaves the bubble under the NEW tab (not back under the old one for a moment)
+      window.dispatchEvent(new CustomEvent("skybee:rowdrag", { detail: { row: tabEl, end: true, to: go !== sel && go >= 0 && go < tabs.length ? go : undefined } }));
+      if (go === sel || go < 0 || go >= tabs.length) return look(0, "", "transform .38s cubic-bezier(.22,1,.36,1), opacity .25s");
+      // the feed leaves the way the finger was going, the next one comes from the other side — one smooth motion
+      const dir = dx < 0 ? -1 : 1, W = Math.min(innerWidth, 600) * .5;
+      look(dir * W, "0", "transform .18s cubic-bezier(.4,0,1,1), opacity .18s");
       setTimeout(() => {
         show(go);
-        look(-dir * 70, "0");
-        requestAnimationFrame(() => requestAnimationFrame(() => look(0, "", "transform .32s var(--ease-move, ease-out), opacity .24s")));
-      }, 160);
+        look(-dir * W * .5, "0");
+        requestAnimationFrame(() => requestAnimationFrame(() => look(0, "", "transform .36s cubic-bezier(.22,1,.36,1), opacity .26s")));
+      }, 180);
     };
     body.addEventListener("touchend", end, { passive: true });
     body.addEventListener("touchcancel", end, { passive: true });
@@ -557,7 +559,7 @@ export async function notifications(el, { filter = "" }) {
       if (horiz === null && (Math.abs(dx) > 12 || Math.abs(dy) > 12)) horiz = Math.abs(dx) > Math.abs(dy) * 1.4;
       if (!horiz) return;
       const edge = (dx > 0 && cur === 0) || (dx < 0 && cur === NFILTERS.length - 1);
-      look(edge ? dx * .15 : dx * .55, String(1 - Math.min(Math.abs(dx) / 700, .3)));
+      look(edge ? Math.sign(dx) * Math.sqrt(Math.abs(dx)) * 3 : dx * .8, String(1 - Math.min(Math.abs(dx) / 500, .45)));
     }, on);
     const end = () => {
       if (x0 == null) return;

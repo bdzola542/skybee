@@ -52,6 +52,7 @@ if ($a === 'subscribe') {
     $dev = ['sub' => ['endpoint' => $ep, 'keys' => ['p256dh' => $p256, 'auth' => $auth]], 'token' => hash('sha256', $token)];
     rec_update($did, function (?array $cur) use ($r, $dev, $ep, $now) { // під замком: пристрої з інших входів не губляться
         $n = $r; $n['devices'] = $cur['devices'] ?? [];
+        if (!empty($cur['sched'])) $n['sched'] = $cur['sched']; // повторний вхід не губить чергу запланованих постів
         $n['mark'] = $cur['mark'] ?? ['n' => $now, 'c' => $now];
         $n['devices'][hash('sha256', $ep)] = $dev;
         if (count($n['devices']) > 5) $n['devices'] = array_slice($n['devices'], -5, null, true);
@@ -70,6 +71,48 @@ if ($a === 'unsubscribe') {
             return $r['devices'] ? $r : false; // без пристроїв пароль на сервері не лишається
         });
     }
+    out(['ok' => true]);
+}
+
+// заплановані пости: той самий токен, що видав subscribe, — доказ, що запит від власника пристрою
+function sched_auth(array $in): ?array {
+    $did = (string)($in['did'] ?? ''); $token = (string)($in['token'] ?? '');
+    if (!preg_match('/^did:plc:[a-z2-7]{24}$/', $did) || $token === '' || strlen($token) > 100) return null;
+    $r = rec_load($did); if (!$r) return null;
+    foreach ($r['devices'] as $dv) if (hash_equals($dv['token'], hash('sha256', $token))) return $r;
+    return null;
+}
+if ($a === 'sched_add') {
+    $r = sched_auth($in); if (!$r) out(['error' => 'auth'], 401);
+    rate('s:' . $r['did'], 30);
+    $at = strtotime((string)($in['at'] ?? '')); $rec = sched_record($in);
+    if (!$rec) out(['error' => 'post'], 400);
+    if (!$at || $at < time() + 60 || $at > time() + 90 * 86400) out(['error' => 'time'], 400);
+    $id = b64u(random_bytes(9)); $full = false;
+    rec_update($r['did'], function (?array $cur) use ($id, $at, $rec, &$full) {
+        if (!$cur) return false;
+        $cur['sched'] = $cur['sched'] ?? [];
+        if (count($cur['sched']) >= 20) { $full = true; return $cur; }
+        $cur['sched'][] = ['id' => $id, 'at' => $at, 'rec' => $rec, 'tries' => 0, 'rkey' => new_tid()];
+        return $cur;
+    });
+    if ($full) out(['error' => 'full'], 400);
+    out(['ok' => true, 'id' => $id]);
+}
+if ($a === 'sched_list') {
+    $r = sched_auth($in); if (!$r) out(['error' => 'auth'], 401);
+    rate('sl:' . $r['did'], 120);
+    out(['ok' => true, 'items' => array_map(fn($x) => ['id' => $x['id'], 'at' => gmdate('c', $x['at']), 'text' => $x['rec']['text']], $r['sched'] ?? [])]);
+}
+if ($a === 'sched_del') {
+    $r = sched_auth($in); if (!$r) out(['error' => 'auth'], 401);
+    rate('sd:' . $r['did'], 120);
+    $id = (string)($in['id'] ?? '');
+    rec_update($r['did'], function (?array $cur) use ($id) {
+        if (!$cur) return false;
+        $cur['sched'] = array_values(array_filter($cur['sched'] ?? [], fn($x) => $x['id'] !== $id));
+        return $cur;
+    });
     out(['ok' => true]);
 }
 out(['error' => 'action'], 400);

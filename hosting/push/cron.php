@@ -37,6 +37,35 @@ foreach ($files as $file) {
     $lang = $r['lang'] ?? 'uk'; $out = [];
     $mark = $r['mark'] ?? ['n' => gmdate('Y-m-d\TH:i:s.000\Z'), 'c' => gmdate('Y-m-d\TH:i:s.000\Z')];
 
+    // 0) заплановані пости: той, чий час настав, спершу знімається зі списку (під замком), потім публікується — двічі не вийде
+    foreach ($r['sched'] ?? [] as $it) {
+        if ($it['at'] > time()) continue;
+        $take = null;
+        rec_update($r['did'], function (?array $cur) use ($it, &$take) {
+            if (!$cur) return false;
+            foreach ($cur['sched'] ?? [] as $k => $x) if ($x['id'] === $it['id']) { $take = $x; unset($cur['sched'][$k]); }
+            if (isset($cur['sched'])) $cur['sched'] = array_values($cur['sched']);
+            return $cur;
+        });
+        if (!$take) continue;
+        $rec = $take['rec']; $rec['createdAt'] = gmdate('Y-m-d\TH:i:s.000\Z');
+        // rkey задано при плануванні: якщо відповідь загубилась після запису, повтор дасть «вже існує», а не другий пост
+        $res = xrpc_post($r, 'com.atproto.repo.createRecord', array_filter(['repo' => $r['did'], 'collection' => $rec['$type'], 'rkey' => $take['rkey'] ?? null, 'record' => $rec], fn($v) => $v !== null));
+        $ok = $res !== null && ($res[0] === 200 || (($take['tries'] ?? 0) > 0 && $res[0] === 400 && stripos(json_encode($res[1]), 'exist') !== false));
+        // нові токени одразу в запис: refresh одноразовий, а далі цикл може піти в continue
+        $nj = ['jwt' => $r['jwt'] ?? null, 'refresh' => $r['refresh'] ?? null];
+        rec_update($r['did'], function (?array $cur) use ($nj) { if (!$cur) return false; return array_merge($cur, array_filter($nj)); });
+        $retry = !$ok && ($res === null ? false : ($res[0] === 0 || $res[0] === 429 || $res[0] >= 500)) && ($take['tries'] ?? 0) < 5 && $take['at'] > time() - 86400;
+        if ($retry) { // тимчасовий збій: назад у чергу, наступна спроба за хвилину
+            $take['tries'] = ($take['tries'] ?? 0) + 1;
+            rec_update($r['did'], function (?array $cur) use ($take) { if (!$cur) return false; $cur['sched'][] = $take; return $cur; });
+            continue;
+        }
+        $body = $ok ? (($lang === 'uk' ? 'Запланований пост опубліковано: ' : 'Scheduled post published: ') . cut((string)$rec['text'], 80))
+                    : ($lang === 'uk' ? 'Не вдалося опублікувати запланований пост — перевір пароль застосунку' : 'A scheduled post could not be published — check the app password');
+        foreach ($r['devices'] as $dv) push_send($dv['sub'], ['title' => 'Skybee', 'body' => $body, 'hash' => '#/', 'tag' => 'sch-' . $it['id']]);
+    }
+
     // 1) сповіщення
     $n = xrpc($r, 'app.bsky.notification.listNotifications', ['limit' => 30]);
     if ($n === null) { // пароль точно більше не діє (відкликаний): три хвилини поспіль — і запис видаляється

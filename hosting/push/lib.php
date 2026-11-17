@@ -192,3 +192,72 @@ function xrpc(array &$r, string $nsid, array $q = [], bool $chat = false): ?arra
     }
     return null;
 }
+
+// POST-запит від імені акаунта (запис поста тощо); сам оновлює токен, як xrpc. null — пароль не діє
+function xrpc_post(array &$r, string $nsid, array $body): ?array {
+    for ($try = 0; $try < 3; $try++) {
+        if (empty($r['jwt'])) {
+            $pw = secret_open($r['pw']); if (!$pw) return null;
+            [$lc, $s] = login_raw($r['pds'], $r['did'], $pw);
+            if ($lc === 200 && !empty($s['accessJwt'])) { $r['jwt'] = $s['accessJwt']; $r['refresh'] = $s['refreshJwt']; }
+            elseif ($lc === 400 || $lc === 401) return null;
+            else return [$lc, []];
+        }
+        [$c, $d] = http('POST', $r['pds'] . '/xrpc/' . $nsid, $body, ['Authorization: Bearer ' . $r['jwt']]);
+        if ($c === 200) return [$c, $d];
+        if ($c === 401 || ($c === 400 && ($d['error'] ?? '') === 'ExpiredToken')) {
+            [$rc, $rd] = http('POST', $r['pds'] . '/xrpc/com.atproto.server.refreshSession', null, ['Authorization: Bearer ' . ($r['refresh'] ?? '')], '');
+            if ($rc === 200 && !empty($rd['accessJwt'])) { $r['jwt'] = $rd['accessJwt']; $r['refresh'] = $rd['refreshJwt']; }
+            elseif ($rc === 400 || $rc === 401) $r['jwt'] = null;
+            else return [$rc, []];
+            continue;
+        }
+        return [$c, $d];
+    }
+    return null;
+}
+
+function new_tid(): string { // ключ запису поста (TID): мікросекунди + 10 біт випадкового
+    $v = ((int)(microtime(true) * 1e6) << 10) | random_int(0, 1023); $s = '';
+    for ($i = 0; $i < 13; $i++) { $s = '234567abcdefghijklmnopqrstuvwxyz'[$v & 31] . $s; $v >>= 5; }
+    return $s;
+}
+
+/* ---------- заплановані пости: лише текст (+ цитата чи відповідь); тримаються в записі акаунта (поле sched) ---------- */
+function strong_ref($x): ?array {
+    return is_array($x) && is_string($x['uri'] ?? null) && is_string($x['cid'] ?? null)
+        && preg_match('#^at://did:[a-z0-9:.%-]{3,200}/app\.bsky\.feed\.post/[A-Za-z0-9._:~-]{1,512}$#', $x['uri'])
+        && preg_match('/^[a-z0-9]{40,100}$/', $x['cid']) ? ['uri' => $x['uri'], 'cid' => $x['cid']] : null;
+}
+// перевіряє й заново збирає запис поста з довіреного шаблону; null — не пройшло
+function sched_record(array $in): ?array {
+    $text = $in['text'] ?? null;
+    if (!is_string($text) || trim($text) === '' || strlen($text) > 3000) return null;
+    if ((function_exists('grapheme_strlen') ? grapheme_strlen($text) : mb_strlen($text)) > 300) return null;
+    $rec = ['$type' => 'app.bsky.feed.post', 'text' => $text];
+    $langs = array_values(array_filter(array_slice((array)($in['langs'] ?? []), 0, 3), fn($l) => is_string($l) && preg_match('/^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})?$/', $l)));
+    if ($langs) $rec['langs'] = $langs;
+    $len = strlen($text);
+    foreach (array_slice((array)($in['facets'] ?? []), 0, 40) as $f) {
+        if (!is_array($f) || !is_array($f['features'] ?? null)) continue;
+        $i = $f['index'] ?? null; $ft = $f['features'][0] ?? null;
+        if (!is_array($i) || !is_array($ft) || !is_int($i['byteStart'] ?? null) || !is_int($i['byteEnd'] ?? null) || $i['byteStart'] < 0 || $i['byteEnd'] > $len || $i['byteStart'] >= $i['byteEnd']) continue;
+        $t = $ft['$type'] ?? '';
+        if ($t === 'app.bsky.richtext.facet#link' && is_string($ft['uri'] ?? null) && preg_match('#^https?://\S{1,2000}$#', $ft['uri'])) $feat = ['$type' => $t, 'uri' => $ft['uri']];
+        elseif ($t === 'app.bsky.richtext.facet#mention' && is_string($ft['did'] ?? null) && preg_match('/^did:[a-z0-9:.%-]{3,200}$/', $ft['did'])) $feat = ['$type' => $t, 'did' => $ft['did']];
+        elseif ($t === 'app.bsky.richtext.facet#tag' && is_string($ft['tag'] ?? null) && strlen($ft['tag']) <= 640) $feat = ['$type' => $t, 'tag' => $ft['tag']];
+        else continue;
+        $rec['facets'][] = ['index' => ['byteStart' => $i['byteStart'], 'byteEnd' => $i['byteEnd']], 'features' => [$feat]];
+    }
+    if (isset($in['reply'])) {
+        if (!is_array($in['reply'])) return null;
+        $root = strong_ref($in['reply']['root'] ?? null); $parent = strong_ref($in['reply']['parent'] ?? null);
+        if (!$root || !$parent) return null;
+        $rec['reply'] = ['root' => $root, 'parent' => $parent];
+    }
+    if (isset($in['quote'])) {
+        $q = strong_ref($in['quote']); if (!$q) return null;
+        $rec['embed'] = ['$type' => 'app.bsky.embed.record', 'record' => $q];
+    }
+    return $rec;
+}

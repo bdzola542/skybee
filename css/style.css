@@ -1655,8 +1655,8 @@ body.calm article.post.sb-post { animation: none !important; }
 :root[data-ui="glass"][data-theme="light"][data-glass="clear"] { --lg-fill: rgba(255,255,255,.32); }
 :root[data-ui="glass"][data-theme="light"][data-glass="frost"] { --lg-fill: rgba(255,255,255,.72); }
 /* refraction: the edges of the glass bend what is behind them (Chromium: desktop app, Android) */
-/* refraction only on the big surfaces (bars, menu, windows): on every card of a feed it cost frames while scrolling */
-html.lg-refract:root[data-ui="glass"] :is(.topbar, nav.bottom, nav.side, .modal, .popmenu, .fab, .msheet) { --lg-filter: url(#lg-refract) blur(var(--lg-blur)) saturate(var(--lg-sat)); }
+/* refraction only on small round glass (bubbles, buttons): on wide bars and windows the map was stretched and smeared what is behind (everything overlapped) */
+html.lg-refract:root[data-ui="glass"] :is(.fab, .navlens, .rowlens, nav.bottom a[data-nav="#/search"], .topbar .ghost.icon) { --lg-filter: url(#lg-refract) blur(var(--lg-blur)) saturate(var(--lg-sat)); }
 
 /* a soft colour field behind everything — glass needs something to show through */
 :root[data-ui="glass"] body::before { content: ""; position: fixed; inset: -12%; z-index: -1; pointer-events: none;
@@ -1693,6 +1693,9 @@ html.lg-refract:root[data-ui="glass"] :is(.topbar, nav.bottom, nav.side, .modal,
 :root[data-ui="glass"] .topbar .ghost, :root[data-ui="glass"] .ghost.icon {
   background: var(--lg-fill); -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); border: 0; box-shadow: var(--lg-rim), 0 2px 10px rgba(0,0,0,.16); }
 :root[data-ui="glass"] .ghost:not(.icon) { background: var(--lg-fill); border: 0; box-shadow: var(--lg-rim); }
+:root[data-ui="glass"][data-theme="light"] .ghost:not(.icon) { box-shadow: var(--lg-rim), 0 0 0 1px rgba(0,0,0,.08); }
+/* the bubbles bend what is behind them (the filter was set, but no backdrop-filter used it) */
+html.lg-refract:root[data-ui="glass"] :is(.navlens, .rowlens) { -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter); }
 :root[data-ui="glass"] .btn:not(.ghost), :root[data-ui="glass"] .fab {
   background: color-mix(in srgb, var(--accent) 82%, transparent); color: var(--accent-ink); border: 0;
   -webkit-backdrop-filter: var(--lg-filter); backdrop-filter: var(--lg-filter);
