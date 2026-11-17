@@ -4,7 +4,7 @@
 import { errText } from "./errors.js";
 import { t } from "./i18n.js";
 import * as api from "./api.js";
-import { esc, modal, toast, confirmBox } from "./ui.js";
+import { esc, modal, toast, confirmBox, playerOf } from "./ui.js";
 import * as saw from "./stars.js";
 
 export const NSID = "io.github.vysocavnu.skybee.profile";
@@ -98,10 +98,14 @@ const trackCard = (m, cls = "") => `<div class="sb-music ${cls}">
   ${m.preview ? `<button type="button" class="sb-play" data-preview="${esc(m.preview)}" title="Послухати уривок">▶</button>` : `<a class="sb-play" href="${esc(m.url)}" target="_blank" rel="noopener" title="Слухати">▶</a>`}</div>`;
 // A tap on the song itself (not on ▶): which service to listen in. Each opens a search for «artist title», so it works with any track
 function streamPicker(title, artist, url) {
+  // an Apple Music track plays right here (the official embedded player; closing the window stops it)
+  const pl = url && /^https:\/\/music\.apple\.com\//.test(url) ? playerOf(url) : null;
   const q = encodeURIComponent(`${artist} ${title}`.trim());
-  const S = [["Spotify", `https://open.spotify.com/search/${q}`], ["Apple Music", `https://music.apple.com/search?term=${q}`],
+  const S = [["Spotify", `https://open.spotify.com/search/${q}`], ...(pl ? [] : [["Apple Music", `https://music.apple.com/search?term=${q}`]]),
     ["YouTube Music", `https://music.youtube.com/search?q=${q}`], ["Deezer", `https://www.deezer.com/search/${q}`]];
-  const m = modal(`<h3>Слухати в…</h3><p class="muted small noi18n">${esc(artist ? artist + " — " : "")}${esc(title)}</p>
+  stopAudio();
+  const m = modal(`<h3>${pl ? "Слухати в Apple Music" : "Слухати в…"}</h3><p class="muted small noi18n">${esc(artist ? artist + " — " : "")}${esc(title)}</p>
+    ${pl ? `<iframe class="sb-embed" src="${esc(pl.src)}" style="width:100%;height:${pl.height}px;border:0;border-radius:12px;margin:4px 0 10px" allow="autoplay; encrypted-media; fullscreen; clipboard-write" referrerpolicy="strict-origin-when-cross-origin" loading="lazy" title="Apple Music"></iframe><p class="muted small">Без підписки Apple Music грає уривок; з підпискою — увійдіть у плеєрі, і він грає повністю.</p>` : ""}
     <div style="display:flex;flex-direction:column;gap:8px">${S.map(([n, u]) => `<a class="btn ghost" href="${esc(u)}" target="_blank" rel="noopener">${n}</a>`).join("")}
     ${url ? `<a class="ghost small" href="${esc(url)}" target="_blank" rel="noopener">Відкрити за посиланням профілю</a>` : ""}</div>
     <div class="row end"><button class="ghost" data-x="0">Закрити</button></div>`);

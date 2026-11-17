@@ -3,7 +3,7 @@ import { errText } from "./errors.js";
 import { t as T } from "./i18n.js";
 import * as api from "./api.js";
 import * as src from "./sources.js";
-import { $, esc, enc, toast, modal, confirmBox, menu, empty, at } from "./ui.js";
+import { $, esc, enc, toast, modal, confirmBox, menu, empty, at, ico } from "./ui.js";
 import { header, paged, notifPager, NFILTERS, isGrid, gridBtn, onGrid, MENU_BTN } from "./views.js";
 
 /* ---------- choosing a source ---------- */
@@ -130,7 +130,7 @@ export async function deck(el) {
     const who = account(c);
     return `<section class="dcol" data-id="${esc(c.id)}">
       <header class="dhead"><span class="dtitle clip" title="${esc(c.label)}">${src.ICON[c.type] || ""} <b>${esc(c.label)}</b>${who ? ` <small class="muted">${at(who.handle)}</small>` : ""}</span>
-        ${c.type === "notifications" ? "" : `<button class="ghost icon" data-d="grid" title="${c.grid ? "Звичайна стрічка" : "Сітка медіа"}">${c.grid ? "☰" : "▦"}</button>`}
+        ${c.type === "notifications" ? "" : `<button class="ghost icon" data-d="grid" title="${c.grid ? "Звичайна стрічка" : "Сітка медіа"}">${ico(c.grid ? "rows" : "grid", 22)}</button>`}
         <button class="ghost icon" data-d="refresh" title="Оновити">↻</button>
         <button class="ghost icon" data-d="menu" title="Ще">⋯</button></header>
       <div class="dbody"></div></section>`;
@@ -166,7 +166,7 @@ export async function deck(el) {
     const id = b.closest(".dcol")?.dataset.id, i = cols.findIndex(c => c.id === id), c = cols[i];
     if (!c) return;
     if (b.dataset.d === "refresh") load(c);
-    if (b.dataset.d === "grid") { c.grid = !c.grid; saveCols(cols); b.outerHTML = `<button class="ghost icon" data-d="grid" title="${c.grid ? "Звичайна стрічка" : "Сітка медіа"}">${c.grid ? "☰" : "▦"}</button>`; load(c); }
+    if (b.dataset.d === "grid") { c.grid = !c.grid; saveCols(cols); b.outerHTML = `<button class="ghost icon" data-d="grid" title="${c.grid ? "Звичайна стрічка" : "Сітка медіа"}">${ico(c.grid ? "rows" : "grid", 22)}</button>`; load(c); }
     if (b.dataset.d === "menu") {
       const act = await menu(b, [
         ...(i > 0 ? [{ act: "left", label: "← Посунути ліворуч" }] : []),

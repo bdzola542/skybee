@@ -338,6 +338,9 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) badg
    Material — the shared X axis, and «fade through» between tabs; Skybee — our own: the screen rises like warm honey.
    Which one: a tab of the menu → tab, the screen we have just come from → back, anything else → forward. */
 const navStack = [];
+// A tap or drag on the tab bar (or a menu item) is a switch between tabs, never «back» or «forward», even when the tab was the previous screen
+let tabTapAt = 0;
+for (const ev of ["pointerdown", "click"]) document.addEventListener(ev, (e) => { if (e.target.closest?.("nav [data-nav]")) tabTapAt = Date.now(); }, { capture: true, passive: true });
 function navKind(path) {
   const h = location.hash || "#/";
   const tab = [...document.querySelectorAll("[data-nav]")].some(a => {
@@ -348,7 +351,8 @@ function navKind(path) {
   if (navStack.length > 1 && navStack[navStack.length - 2] === h) { navStack.pop(); kind = "pop"; }
   else if (navStack[navStack.length - 1] !== h) navStack.push(h); else kind = "none"; // the same screen redrawn
   if (navStack.length > 50) navStack.splice(0, navStack.length - 50);
-  return kind === "push" && tab ? "tab" : kind; // going back is always «back», even onto a tab
+  if (tab && kind !== "none" && Date.now() - tabTapAt < 2500) { tabTapAt = 0; return "tab"; }
+  return kind === "push" && tab ? "tab" : kind; // going back (system button, swipe) is «back», even onto a tab
 }
 function playNav(main, kind) {
   main.classList.remove("nav-push", "nav-pop", "nav-tab");
@@ -498,15 +502,18 @@ function liquid(lens, x) {
   lens._x = x;
   lens.style.setProperty("--lx", x + "px");
   if (from == null || Math.abs(from - x) < 3 || document.documentElement.dataset.ui !== "glass" || calmMotion() || !lens.animate) return;
-  const w = lens.offsetWidth || 60, d = Math.min(Math.abs(x - from) / w, 2.5);
+  const w = lens.offsetWidth || 60, d = Math.min(Math.abs(x - from) / w, 2);
   const mid = from + (x - from) * .55;
   lens._anim?.cancel();
-  lens._anim = lens.animate([
+  lens.classList.add("flow"); // the css transition of the move steps aside while this animation plays (they fought: the bubble jerked and smeared)
+  const a = lens._anim = lens.animate([
     { transform: `translateX(${from}px) scale(1, 1)` },
-    { transform: `translateX(${mid}px) scale(${1 + .18 * d}, ${1 - .07 * d})`, offset: .45 },
-    { transform: `translateX(${x + (x > from ? 4 : -4)}px) scale(.96, 1.04)`, offset: .78 },
+    { transform: `translateX(${mid}px) scale(${1 + .09 * d}, ${1 - .04 * d})`, offset: .45 },
+    { transform: `translateX(${x + (x > from ? 2 : -2)}px) scale(.99, 1.01)`, offset: .8 },
     { transform: `translateX(${x}px) scale(1, 1)` },
-  ], { duration: 420 + 60 * Math.min(d, 2), easing: "cubic-bezier(.25,.8,.35,1)" });
+  ], { duration: 340 + 40 * d, easing: "cubic-bezier(.25,.8,.35,1)" });
+  const end = () => { if (lens._anim === a) lens.classList.remove("flow"); };
+  a.onfinish = a.oncancel = end;
 }
 
 /* ---------- Liquid Glass: the light on the glass follows the tilt of the phone (or the mouse on a computer) ----------

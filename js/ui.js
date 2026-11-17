@@ -53,6 +53,9 @@ const ICO = {
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7"/><path d="M12 17v.01"/>',
   qr: '<rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h3v3M20.5 14v.01M14 20.5h.01M17 20.5h3.5V17"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/>',
+  rows: '<rect x="4" y="4.5" width="16" height="6.5" rx="2"/><rect x="4" y="13" width="16" height="6.5" rx="2"/>',
   info: '<rect x="4" y="4" width="16" height="14" rx="1.5"/><path d="M9 18l3 3 3-3M12 8v.01M12 11v4"/>',
 };
 // The same icons drawn in the manner of each platform (css shows the set of the chosen interface style, «Стиль інтерфейсу»):
@@ -60,6 +63,9 @@ const ICO = {
 // Skybee keeps the neutral line set above. A name without its own drawing falls back to the neutral one.
 const GEAR = "M18.8 9.5L21 10.2V13.8L18.8 14.5L18.6 15.1L19.6 17.1L17.1 19.6L15.1 18.6L14.5 18.8L13.8 21H10.2L9.5 18.8L8.9 18.6L6.9 19.6L4.4 17.1L5.4 15.1L5.2 14.5L3 13.8V10.2L5.2 9.5L5.4 8.9L4.4 6.9L6.9 4.4L8.9 5.4L9.5 5.2L10.2 3H13.8L14.5 5.2L15.1 5.4L17.1 4.4L19.6 6.9L18.6 8.9z";
 const ICO_GL = {
+  menu: '<path d="M4.5 7h15M4.5 12h15M4.5 17h15"/>',
+  grid: '<rect x="3.8" y="3.8" width="7.4" height="7.4" rx="2.2"/><rect x="12.8" y="3.8" width="7.4" height="7.4" rx="2.2"/><rect x="3.8" y="12.8" width="7.4" height="7.4" rx="2.2"/><rect x="12.8" y="12.8" width="7.4" height="7.4" rx="2.2"/>',
+  rows: '<rect x="3.8" y="4" width="16.4" height="7" rx="2.4"/><rect x="3.8" y="13" width="16.4" height="7" rx="2.4"/>',
   home: '<path d="M3.5 10.8L12 3.8l8.5 7V19a1.8 1.8 0 0 1-1.8 1.8H5.3A1.8 1.8 0 0 1 3.5 19z"/><path d="M9.6 20.8v-5a1 1 0 0 1 1-1h2.8a1 1 0 0 1 1 1v5"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.6"/><path d="M15.4 15.4l5.1 5.1"/>',
   bell: '<path d="M6 16.5v-5a6 6 0 0 1 12 0v5l1.6 2H4.4z"/><path d="M10 20.8a2.2 2.2 0 0 0 4 0"/>',
@@ -786,3 +792,24 @@ export function infinite(container, loader, root = null) {
 // Empty screen: the bee at the end of its dashed flight path over faint honeycomb (css: .empty)
 export const empty = (msg) => `<div class="empty"><div class="etrail" aria-hidden="true"><svg viewBox="0 0 120 60"><path d="M4 52c14-2 22-12 18-22s-14-6-10 2 22 10 38-6S88 6 104 10"/></svg>${bee(30)}</div><p class="muted center">${esc(msg)}</p></div>`;
 export const spinner = () => `<div class="sentinel"><div class="spinner"></div></div>`;
+
+/* ---------- a picture that did not load: a question mark made of honey (in the colour of the app's buttons) ---------- */
+const honeyQ = (c) => {
+  const hex = /^#[0-9a-f]{3,8}$/i.test(c) ? c : "#f5b301";
+  const q = "M33 38C33 16 67 16 67 38C67 52 50 53 50 66";
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><g stroke-linecap="round" stroke-linejoin="round" fill="none">
+<path d="${q}" stroke="#000" stroke-opacity=".28" stroke-width="17"/><path d="${q}" stroke="${hex}" stroke-width="12.5"/>
+<path d="M39 30C42 22 52 21 58 26" stroke="#fff" stroke-opacity=".55" stroke-width="2.6"/></g>
+<g fill="${hex}" stroke="#000" stroke-opacity=".28" stroke-width="1.6"><path d="M26.8 40h6.4v8a3.2 3.2 0 0 1-6.4 0z"/><path d="M62.8 44h6.4v13a3.2 3.2 0 0 1-6.4 0z"/><path d="M45 56h5v6a2.5 2.5 0 0 1-5 0z" transform="translate(2 4)"/></g>
+<circle cx="50" cy="80" r="7.5" fill="${hex}" stroke="#000" stroke-opacity=".28" stroke-width="1.6"/><circle cx="47.5" cy="77.5" r="2.2" fill="#fff" fill-opacity=".6"/></svg>`;
+  return "data:image/svg+xml," + encodeURIComponent(svg);
+};
+// `error` does not bubble, so it is caught on the way down; a picture is swapped once (no loop if the swap itself fails)
+document.addEventListener("error", (e) => {
+  const i = e.target;
+  if (!i || i.tagName !== "IMG" || i.dataset.bk || i.closest(".lb-stage") || navigator.onLine === false) return; // offline: not «broken», just not loaded yet
+  i.dataset.bk = "1";
+  i.classList.add("imgbroken");
+  i.removeAttribute("srcset");
+  i.src = honeyQ(getComputedStyle(document.documentElement).getPropertyValue("--accent").trim());
+}, true);

@@ -6,13 +6,13 @@ import { session } from "./api.js";
 import {
   bee, isLive, postHref, $, esc, enc, safeUrl, num, ago, name, avatar, richText, linkify, renderPost, renderActor, renderFeedCard, followBtn,
   infinite, empty, spinner, toast, modal, menu, profileHref, cachePost, actors, mutedBy, gateLine, pwa, vname, warnLabel, hiddenReplies, renderEmbed, at,
-  leave,
+  leave, ico,
 } from "./ui.js";
 import * as notify from "./notify.js";
 import * as flair from "./flair.js";
 import * as src from "./sources.js";
 
-export const MENU_BTN = `<button class="ghost icon only-mobile" data-act="drawer" title="Меню">☰</button>`; // phones: opens the side menu
+export const MENU_BTN = `<button class="ghost icon only-mobile" data-act="drawer" title="Меню">${ico("menu", 26)}</button>`; // phones: opens the side menu
 export const header = (title, back = false, right = "") =>
   `<div class="topbar">${back ? `<button class="ghost icon" data-act="back">←</button>` : MENU_BTN}<h2>${title}</h2><div class="grow"></div>${right}</div>`;
 
@@ -37,7 +37,7 @@ export function paged(el, fetchPage, { cls = "", root = null } = {}) {
 /* ---------- list / media grid switch ---------- */
 // Remembered per screen («home», «feed», «myfeed»…)
 export const isGrid = (key) => { try { return localStorage.getItem("skybee.grid." + key) === "1"; } catch { return false; } };
-export const gridBtn = (key) => `<button class="ghost icon" data-grid="${esc(key)}" title="${isGrid(key) ? "Звичайна стрічка" : "Сітка медіа: лише фото й відео"}">${isGrid(key) ? "☰" : "▦"}</button>`;
+export const gridBtn = (key) => `<button class="ghost icon" data-grid="${esc(key)}" title="${isGrid(key) ? "Звичайна стрічка" : "Сітка медіа: лише фото й відео"}">${ico(isGrid(key) ? "rows" : "grid", 26)}</button>`;
 // one listener on the screen: flips the mode and redraws through `redraw`
 export function onGrid(el, redraw) {
   el._grid?.abort(); // the screen element is reused: a second listener would flip the mode twice (and nothing would change)

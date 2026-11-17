@@ -1925,3 +1925,15 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color])
 :root[data-ui="glass"] article.post .actions :is(button, .btn, .ghost) { -webkit-backdrop-filter: none; backdrop-filter: none; }
 /* the photo viewer's buttons are big enough to hit */
 .lb-btn, .lb-prev, .lb-next { min-width: 44px; min-height: 44px; }
+
+/* ---------- top bar icons (menu, grid): larger, SF-Symbols-like ---------- */
+.topbar .ghost.icon { display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; }
+.topbar .ghost.icon .ico { width: 26px; height: 26px; stroke-width: 2; }
+:root[data-ui="glass"] .topbar .ghost.icon .ico { stroke-width: 2.1; }
+:root[data-ui="material"] .topbar .ghost.icon .ico { width: 24px; height: 24px; }
+/* a picture that did not load (honey question mark, ui.js) */
+img.imgbroken { object-fit: contain !important; padding: 12%; background: color-mix(in srgb, var(--line) 70%, transparent); }
+.imgs img.imgbroken { min-height: 120px; padding: 20px; }
+
+/* the bubble in the tab bar: while the JS flow animation plays, only its width and opacity are transitioned (no overshoot) */
+:root[data-ui="glass"] .navlens.flow { transition: width .34s cubic-bezier(.25,.8,.35,1), opacity .2s !important; }
