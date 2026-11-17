@@ -171,7 +171,21 @@ export function linkify(s) {
     return m;
   });
 }
-export function richText(text = "", facets) {
+// «23:00 UTC» → also in the reader's own time
+function localTimes(html) {
+  // only the text between tags (never inside <a href="…"> or any attribute), and not inside links
+  let inA = false;
+  return html.split(/(<[^>]+>)/).map(part => {
+    if (part[0] === "<") { if (/^<a[\s>]/i.test(part)) inA = true; else if (/^<\/a>/i.test(part)) inA = false; return part; }
+    if (inA) return part;
+    return part.replace(/\b([01]?\d|2[0-3]):([0-5]\d)\s?(UTC|GMT)\b/g, (all, h, m) => {
+      const d = new Date(); d.setUTCHours(+h, +m, 0, 0);
+      return `${all} <span class="ltime">(у вас ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})</span>`;
+    });
+  }).join("");
+}
+export const richText = (text = "", facets) => localTimes(richTextRaw(text, facets));
+function richTextRaw(text = "", facets) {
   if (!facets?.length) return linkify(text);
   const bytes = te.encode(text);
   let out = "", pos = 0;

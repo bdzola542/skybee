@@ -3,6 +3,7 @@ import { errText } from "./errors.js";
 import * as api from "./api.js";
 import { sortAZ, locale } from "./i18n.js";
 import * as scheduler from "./push.js";
+import * as X from "./extras.js";
 import { esc, modal, toast, avatar, name, richText, spinner, at } from "./ui.js";
 
 const LANGS = sortAZ([["uk", "Українська"], ["en", "English"], ["pl", "Polski"], ["be", "Беларуская"], ["ru", "Русский"], ["de", "Deutsch"], ["cs", "Čeština"], ["es", "Español"], ["ja", "日本語"]]);
@@ -154,9 +155,10 @@ export function openComposer(opts = {}, onDone) {
     <div class="composer">
       <div class="row between">
         <button class="ghost" data-c="cancel">Скасувати</button>
-        <span class="row" style="gap:6px"><button class="ghost" data-c="later" title="Запланувати пост" ${scheduler.canSchedule() ? "" : "hidden"}>🕒</button><button class="btn" data-c="send"></button></span>
+        <span class="row" style="gap:6px"><button class="ghost" data-c="drafts" title="Чернетки">📝</button><button class="ghost" data-c="later" title="Запланувати пост" ${scheduler.canSchedule() ? "" : "hidden"}>🕒</button><button class="btn" data-c="send"></button></span>
       </div>
       ${replyTo ? `<div class="ctx">${avatar(replyTo.author, 28)}<div><b>${name(replyTo.author)}</b><div class="text small">${richText((replyTo.record?.text || "").slice(0, 300), replyTo.record?.facets)}</div></div></div>` : ""}
+      <datalist id="sb-alts">${X.recentAlts().map(a => `<option value="${esc(a)}">`).join("")}</datalist>
       <div class="parts" data-parts="before"></div>
       <textarea placeholder="${replyTo ? "Напиши відповідь" : "Що нового?"}" maxlength="3000">${esc(opts.text ?? (plain ? draft.get() : ""))}</textarea>
       <div class="results mentions"></div>
@@ -193,7 +195,7 @@ export function openComposer(opts = {}, onDone) {
   const before = m.querySelector("[data-parts=before]"), after = m.querySelector("[data-parts=after]"), addBtn = m.querySelector("[data-c=addpart]");
   ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
 
-  const altInput = (key, value) => `<input placeholder="ALT — опис для незрячих" value="${esc(value)}" data-alt="${key}">`;
+  const altInput = (key, value) => `<input placeholder="ALT — опис для незрячих" value="${esc(value)}" data-alt="${key}" list="sb-alts">`;
   const renderPreviews = () => {
     pv.classList.toggle("one", !!video);
     pv.innerHTML = video
@@ -281,7 +283,7 @@ export function openComposer(opts = {}, onDone) {
       } else if (f.type.startsWith("image/")) {
         if (video) { toast("Фото не можна поєднати з відео чи GIF"); break; }
         if (images.length >= 4) { toast("Максимум 4 зображення"); break; }
-        images.push({ file: f, url: URL.createObjectURL(f), alt: "" });
+        images.push({ file: f, url: URL.createObjectURL(f), alt: X.altFor(f) });
       }
     }
     renderPreviews(); renderCard(); update();
@@ -294,7 +296,7 @@ export function openComposer(opts = {}, onDone) {
   m.querySelector("[data-noquote]").addEventListener("change", e => { noQuote = e.target.checked; });
   pv.addEventListener("input", e => {
     const k = e.target.dataset.alt;
-    if (k === "v") video.alt = e.target.value; else if (k) images[k].alt = e.target.value;
+    if (k === "v") video.alt = e.target.value; else if (k) { images[k].alt = e.target.value; X.rememberAlt(images[k].file, e.target.value); }
   });
   // captions for a video: WebVTT files, one per language (Bluesky takes up to 20, 20 KB each)
   pv.addEventListener("change", e => {
@@ -344,6 +346,19 @@ export function openComposer(opts = {}, onDone) {
     if (c === "gate") {
       gateBox.hidden = !gateBox.hidden;
       gate ||= gateForm(gateBox.querySelector("[data-gateform]"), allow, v => { allow = v; gateBtn.textContent = gateLabel(v); });
+    }
+    if (c === "drafts" && !busy) {
+      const dm = modal(`<h3>Чернетки</h3><button class="btn sm" data-d="save">💾 Зберегти цей текст як чернетку</button><div data-dl></div><p class="muted small">Чернетки лишаються на цьому пристрої.</p><div class="row end"><button class="ghost" data-d="close">Закрити</button></div>`);
+      const draw = () => { dm.querySelector("[data-dl]").innerHTML = X.drafts().map(d => `<div class="row between small" style="gap:8px;margin:8px 0"><span class="clip noi18n" style="flex:1">${esc(d.text.slice(0, 80))}</span><button class="ghost sm" data-d="use" data-id="${esc(d.id)}">Взяти</button><button class="ghost sm" data-d="del" data-id="${esc(d.id)}">✕</button></div>`).join("") || `<p class="muted pad">Чернеток ще нема</p>`; };
+      draw();
+      dm.addEventListener("keydown", (ev) => { if (ev.key === "Escape") ev.stopPropagation(); });
+      dm.addEventListener("click", (ev) => {
+        const b = ev.target.closest("[data-d]"); if (!b) return; const id = b.dataset.id;
+        if (b.dataset.d === "close") dm.close();
+        if (b.dataset.d === "save") { if (X.saveDraft(ta.value)) { toast("Чернетку збережено 📝"); draw(); } }
+        if (b.dataset.d === "del") { X.dropDraft(id); draw(); }
+        if (b.dataset.d === "use") { const d = X.drafts().find(x => x.id === id); if (d && (!ta.value.trim() || confirm("Замінити поточний текст чернеткою?"))) { ta.value = d.text; update(); ta.dispatchEvent(new Event("input", { bubbles: true })); dm.close(); } }
+      });
     }
     if (c === "later" && !busy) {
       const x = all().filter(filled);
@@ -470,6 +485,7 @@ async function publish({ text, images, video, card, replyTo, quote, lang, warn, 
       const { blob, width, height } = await api.prepareImage(im.file);
       const ref = await api.uploadBlob(blob);
       out.push({ image: ref, alt: im.alt || "", aspectRatio: { width, height } });
+      X.rememberAlt(im.file, im.alt);
     }
     media = { $type: "app.bsky.embed.images", images: out };
   } else if (card) {
