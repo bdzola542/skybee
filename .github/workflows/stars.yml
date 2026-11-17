@@ -1,6 +1,6 @@
 # Раз на добу оновлює data/stars.json з starsaboutwar.in.ua (позиції виконавців щодо війни для «✨ Оформлення»).
 # Сайт не має API і не дозволяє читати себе з браузера, тож дані збирає цей workflow, а Skybee читає готовий файл
-# із GitHub Pages. Коміт робиться лише тоді, коли щось змінилося (нові виконавці, зміна позиції).
+# зі skybee.online. Файл кладеться в гілку stars-data лише тоді, коли щось змінилося (нові виконавці, зміна позиції).
 name: Stars about war
 
 on:
@@ -21,18 +21,42 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false # токен — лише в кроці push, не поруч зі скриптом, що розбирає чужий HTML
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
+      # main захищений правилом (лише через PR), тож свіжі дані живуть в окремій службовій гілці stars-data
+      # (один файл data/stars.json). Hosting (NIC.UA) бере файл звідти — звідти ж його читають застосунки (skybee.online).
+      - name: Узяти попередні дані з гілки stars-data
+        run: |
+          if git fetch --depth=1 origin stars-data 2>/dev/null; then
+            if git show FETCH_HEAD:data/stars.json > "$RUNNER_TEMP/prev.json" && [ -s "$RUNNER_TEMP/prev.json" ]; then
+              mv "$RUNNER_TEMP/prev.json" data/stars.json && echo "Попередні дані — з stars-data"
+            else
+              echo "::warning::У stars-data немає data/stars.json — беру з main"
+            fi
+          else
+            echo "Гілки stars-data ще немає — беру data/stars.json з main"
+          fi
+          cp data/stars.json "$RUNNER_TEMP/stars.prev.json"
       - name: Зібрати дані
         run: node scripts/stars-sync.mjs
-      - name: Зберегти, якщо змінилися
+      - name: Зберегти в stars-data, якщо змінилися
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
-          if git diff --quiet -- data/stars.json && git ls-files --error-unmatch data/stars.json >/dev/null 2>&1; then
+          node scripts/stars-check.mjs data/stars.json
+          if cmp -s data/stars.json "$RUNNER_TEMP/stars.prev.json" && git ls-remote --exit-code --heads origin stars-data >/dev/null; then
             echo "Без змін"; exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/stars.json
-          git commit -m "Дані starsaboutwar.in.ua: щоденне оновлення"
-          git push
+          # гілка без історії з одним файлом: щодня перезаписується, репозиторій не росте
+          git checkout -q --orphan stars-data-new
+          git rm -rqf --cached .
+          git add -f data/stars.json
+          git commit -qm "Дані starsaboutwar.in.ua: щоденне оновлення"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)" \
+            push --force "https://github.com/$REPO.git" HEAD:refs/heads/stars-data

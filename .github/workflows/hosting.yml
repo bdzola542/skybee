@@ -14,7 +14,7 @@ on:
     paths: ["index.html", "404.html", "offline.html", "favicon.ico", "manifest.webmanifest", "sw.js", "robots.txt", "sitemap.xml",
             "css/**", "js/**", "icons/**", "errors/**", "data/**", "hosting/**", ".github/workflows/hosting.yml"]
   workflow_run:
-    workflows: ["Stars about war"] # його коміт від GITHUB_TOKEN сам інших workflow не запускає
+    workflows: ["Stars about war"] # він кладе дані в гілку stars-data, а не в main, тож push-тригер його не бачить
     types: [completed]
     branches: ["main"]
   workflow_dispatch:
@@ -47,6 +47,13 @@ jobs:
         run: |
           mkdir site
           cp -r index.html 404.html offline.html favicon.ico manifest.webmanifest sw.js robots.txt sitemap.xml css js icons errors data site/
+          # свіжі дані starsaboutwar (main захищений, тож stars.yml кладе їх у гілку stars-data); немає гілки — лишаються з main
+          if git fetch --depth=1 origin stars-data 2>/dev/null && git show FETCH_HEAD:data/stars.json > "$RUNNER_TEMP/stars.json" \
+             && node scripts/stars-check.mjs "$RUNNER_TEMP/stars.json"; then
+            cp "$RUNNER_TEMP/stars.json" site/data/stars.json && echo "data/stars.json — з гілки stars-data"
+          else
+            echo "::warning::Гілка stars-data недоступна або дані в ній зламані — data/stars.json з main"
+          fi
           cp hosting/.htaccess site/
           mkdir -p site/push && cp hosting/push/lib.php hosting/push/api.php hosting/push/cron.php hosting/push/.htaccess site/push/
           echo "{\"time\": $(date +%s)000}" > site/build.json
