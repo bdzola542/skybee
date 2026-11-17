@@ -683,7 +683,7 @@ const RELEASES = "https://github.com/vysocavnu/skybee/releases/latest";
 const PI = {
   windows: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M12 4v16M3 12h18"/>',
   android: '<path d="M5 17v-5a7 7 0 0 1 14 0v5z"/><path d="M8 5.5L6.5 3.5M16 5.5l1.5-2"/><circle cx="9.5" cy="12" r=".6"/><circle cx="14.5" cy="12" r=".6"/><path d="M5 17h14v1.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 18.5z"/>',
-  ios: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 5h3M11 18.5h2"/>',
+  ios: '<path d="M12 7.6C10.4 6.5 7.4 6.3 5.9 8.6c-1.6 2.5-.8 6.7 1.3 9.5 1.1 1.5 2.3 2.4 3.4 1.9.9-.4 1.9-.4 2.8 0 1.1.5 2.3-.4 3.4-1.9.8-1.1 1.4-2.3 1.8-3.5-1.8-.8-2.6-2.4-2.5-4 .1-1.3.8-2.3 1.7-2.9-1.5-1.6-4.2-1.6-5.8-.1z"/><path d="M12 7.4c0-2 1.3-3.6 3-4 0 2-1.3 3.6-3 4z"/>',
   appimage: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M7 9.5l3 2.5-3 2.5M12 15h5"/>',
   flatpak: '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/>',
   tar: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M12 3v2h-2v2h2v2h-2v2h2v2M10.5 15h3v3h-3z"/>',
