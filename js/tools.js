@@ -150,7 +150,7 @@ function candidates(token, guess = true) {
   if (guess && /^[a-z0-9_-]{3,}$/.test(t)) return [`${t}.bsky.social`].filter(validHandle);
   return [];
 }
-function findFriends() {
+export function findFriends() {
   const m = modal(`<h3>🔎 Знайти знайомих</h3><p class="muted small">Вставте імена людей (по одному в рядку чи через кому): нікнейми з X, адреси Mastodon (user@instance), домени Bluesky. Skybee перевірить, хто з них є в Bluesky.</p>
     <textarea data-ta rows="6" maxlength="20000" placeholder="@name&#10;user@mastodon.social&#10;someone.com"></textarea><div data-res></div><p class="err"></p>
     <div class="row between"><button class="ghost" data-x="0">Закрити</button><button class="btn" data-x="1">Знайти</button></div>`);
@@ -180,7 +180,7 @@ function findFriends() {
 /* ---------- Skybee settings through the own account (another phone or computer takes them from there) ---------- */
 const NS = "io.github.vysocavnu.skybee.settings";
 const KEYS = ["theme", "color", "ui", "glass", "glassFloat", "lgTilt", "lgRefract", "intro", "mTonal", "mLabels", "mRipple", "font", "lang", "ui.lang", "tlang", "contentLangs", "requireAlt", "calm", "autogif", "players", "postColors", "badge", "hotkeys", "feedLook"];
-function syncDialog() {
+export function syncDialog() {
   const m = modal(`<h3>☁️ Налаштування між пристроями</h3><p class="muted small">Зберігає вигляд і мови Skybee в одному записі вашого акаунта Bluesky (паролів і токенів там немає, але запис публічний: його може побачити будь-хто). На іншому пристрої натисніть «Завантажити».</p><p class="err"></p>
     <div class="row between"><button class="btn" data-x="up">⬆️ Зберегти в акаунт</button><button class="btn ghost" data-x="down">⬇️ Завантажити з акаунта</button></div>
     <div class="row end"><button class="ghost" data-x="0">Закрити</button></div>`);
