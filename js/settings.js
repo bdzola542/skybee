@@ -128,7 +128,7 @@ export async function accounts(el) {
     </div>`;
   }).join("");
   el.innerHTML = header("Акаунти", true) + `<div class="card"><div id="acclist">${draw()}</div>
-    <button class="ghost sm" data-act="addAccount">➕ Додати акаунт</button>
+    <button class="ghost sm" data-act="addAccount">Додати акаунт</button>
     <p class="small muted">Тут усі акаунти, у які ви увійшли на цьому пристрої. Перемикатися можна без повторного входу.</p></div>`;
   api.get("app.bsky.actor.getProfiles", { actors: api.accounts.map(a => a.did).slice(0, 25) })
     .then(d => { const box = $("#acclist", el); if (box) box.innerHTML = draw(d.profiles); }).catch(() => {});
@@ -185,7 +185,7 @@ export async function account(el) {
     </div>
     <div class="card">
       <h3>Мої дані</h3>
-      <button class="ghost sm" id="export">⬇️ Завантажити архів (CAR)</button>
+      <button class="ghost sm" id="export">Завантажити архів (CAR)</button>
       <p class="small muted">Усі ваші пости, вподобання й підписки одним файлом. Медіафайли в архів не входять.</p>
       <p class="small muted">DID: <code>${esc(a.did)}</code><br>Сервер: <code>${esc(session.pds)}</code></p>
     </div>
@@ -318,7 +318,7 @@ export async function moderation(el) {
       ${row("#/settings/blocked-by", "lock", "Хто мене заблокував")}
       ${row("#/lists", "users", "Модераційні списки")}
     </div>
-    <div class="card"><h3>🛡️ Сервіси модерації</h3><div data-labelers>${spinner()}</div>
+    <div class="card"><h3>Сервіси модерації</h3><div data-labelers>${spinner()}</div>
       <p class="hint">Підписатися на інший сервіс можна на його профілі — там же налаштовуються його мітки. Знайти сервіси: пошук «labeler» або списки на кшталт bluesky-labelers.</p></div>
     <p class="pad small muted">Приховані акаунти не бачать, що ви їх приховали. Заблоковані не можуть бачити ваші пости й взаємодіяти з вами.</p>`;
   const box = $("[data-labelers]", el);
@@ -381,7 +381,7 @@ async function pushCard(card) {
   const draw = async () => {
     const on = await push.active();
     card.innerHTML = `<h3>Push при закритому застосунку</h3>` + (on
-      ? `<p class="small">✅ Увімкнено на цьому пристрої: сповіщення й нові повідомлення приходять, навіть коли Skybee закритий.</p><button class="ghost" id="pushoff">Вимкнути й видалити пароль із сервера</button>`
+      ? `<p class="small">Увімкнено на цьому пристрої: сповіщення й нові повідомлення приходять, навіть коли Skybee закритий.</p><button class="ghost" id="pushoff">Вимкнути й видалити пароль із сервера</button>`
       : `<p class="small muted">Сервер Skybee раз на хвилину питає Bluesky про нове й надсилає push. Для цього потрібен <b>окремий пароль застосунку</b>
           (Bluesky → Налаштування → Паролі застосунків). Щоб приходили й чати — постав галочку <b>«Allow access to your direct messages»</b>.
           Пароль зберігається на сервері зашифрованим, вимкнення його видаляє; у будь-який момент його можна відкликати в Bluesky.</p>
@@ -443,7 +443,7 @@ export async function media(el) {
       <p class="small muted">Безплатний: Google Cloud Console → новий проєкт → увімкнути «Tenor API» → «Облікові дані» → «Створити ключ API». Зберігається лише на цьому пристрої.</p>
       ${toggle("sbbadge", "Значок Skybee біля мого імені", store.get("skybee.badge") === "1", "Інші користувачі Skybee бачать біля вашого імені нашу бджолу (у вашому репозиторії зберігається позначка). Вимкнете — позначку буде прибрано")}
       ${toggle("postcolors", "Кольори профілів на постах", store.get("skybee.postColors") !== "0", "Пости людей з оформленням Skybee — на м'якому градієнті їхнього профілю")}
-      <p class="small muted">🔒 Оформлення Skybee безпечне для твоєї IP-адреси: чужі записи читаються через публічний кеш, а іграшка — з CDN, тож сервер власника профілю тебе не бачить.</p>
+      <p class="small muted">Оформлення Skybee безпечне для твоєї IP-адреси: чужі записи читаються через публічний кеш, а іграшка — з CDN, тож сервер власника профілю тебе не бачить.</p>
       ${toggle("players", "Вбудовані плеєри", store.get("skybee.players") !== "0", "YouTube, Spotify, SoundCloud, Vimeo, Twitch, Apple Music грають прямо в пості — після натискання ▶")}
       ${toggle("extmedia", "Показувати картки посилань із зображеннями", store.get("skybee.noLinkThumbs") !== "1")}
     </div>`;
@@ -631,18 +631,18 @@ const BSC = "https://bskycheck.com/";
 export async function analytics(el) {
   el.innerHTML = header("Аналітика та інструменти", true) + `
     <div class="sgroup">
-      ${row("#/tools/stats", "media", "📊 Статистика мого профілю: лайки, активність, найкращі пости")}
-      ${row("#/tools/follows", "users", "👥 Підписки: хто не підписаний у відповідь, хто відписався")}
-      ${row("#/settings/blocked-by", "shield", "⛔ Хто мене заблокував")}
-      <button class="srow" data-tool="friends"><span class="grow">🔎 Знайти знайомих зі списку (X, Mastodon…)</span></button>
-      <button class="srow" data-tool="sync"><span class="grow">☁️ Налаштування Skybee між пристроями</span></button>
+      ${row("#/tools/stats", "media", "Статистика мого профілю: лайки, активність, найкращі пости")}
+      ${row("#/tools/follows", "users", "Підписки: хто не підписаний у відповідь, хто відписався")}
+      ${row("#/settings/blocked-by", "shield", "Хто мене заблокував")}
+      <button class="srow" data-tool="friends"><span class="sicon">${IC.search}</span><span class="grow">Знайти знайомих зі списку (X, Mastodon…)</span></button>
+      <button class="srow" data-tool="sync"><span class="sicon">${IC.globe}</span><span class="grow">Налаштування Skybee між пристроями</span></button>
     </div>
     <div class="card"><h3>Bluesky загалом — bskycheck</h3>
       <p class="small muted">Незалежний безкоштовний сервіс (не Bluesky): живі дані з відкритого потоку Bluesky. Сторінки відкриваються у вікні застосунку.</p>
       <div class="col" style="gap:8px">
-        <a class="btn ghost" href="${BSC}stats.php" target="_blank" rel="noopener">📈 Кількість користувачів і ріст</a>
-        <a class="btn ghost" href="${BSC}jazco.php" target="_blank" rel="noopener">🆕 Реєстрації та пости за сьогодні</a>
-        <a class="btn ghost" href="${BSC}bots.php" target="_blank" rel="noopener">🤖 Ботоактивність у мережі</a>
+        <a class="btn ghost" href="${BSC}stats.php" target="_blank" rel="noopener">Кількість користувачів і ріст</a>
+        <a class="btn ghost" href="${BSC}jazco.php" target="_blank" rel="noopener">Реєстрації та пости за сьогодні</a>
+        <a class="btn ghost" href="${BSC}bots.php" target="_blank" rel="noopener">Ботоактивність у мережі</a>
       </div></div>
     <div class="card"><h3>Перевірка акаунта на бота</h3>
       <p class="small muted">Нік скопіюється, а на сторінці bskycheck його лишається вставити (3 перевірки на день без входу).</p>
@@ -661,7 +661,7 @@ export async function analytics(el) {
 /* ================= HELP ================= */
 export async function help(el) {
   el.innerHTML = header("Довідка", true) + `
-    ${isUk ? `<div class="sgroup">${row("#/newcomers", "help", "🌱 Для новеньких: як усе працює, українські стрічки й списки 🇺🇦")}</div>` : ""}
+    ${isUk ? `<div class="sgroup">${row("#/newcomers", "help", "Для новеньких: як усе працює, українські стрічки й списки")}</div>` : ""}
     <div class="card"><h3>Клавіатура</h3>
       <p><kbd>N</kbd> — новий пост<br><kbd>/</kbd> — пошук<br><kbd>Ctrl</kbd> + <kbd>Enter</kbd> — опублікувати з редактора<br><kbd>Esc</kbd> — закрити вікно</p></div>
     <div class="card"><h3>Пароль застосунку чи основний?</h3>
@@ -729,13 +729,13 @@ export async function about(el) {
     <div class="card center"><div class="aboutbee">${bee(110)}</div><h3>Skybee</h3>
       <p class="small muted">Відкритий клієнт для Bluesky. Без реклами, без трекерів, без збирання даних: усе зберігається у вашому акаунті Bluesky або в цьому браузері.</p>
       <a class="ghost sm" href="https://github.com/vysocavnu/skybee" target="_blank" rel="noopener">Код на GitHub</a>
-      ${window.skybeeDesktop || isNative || matchMedia("(display-mode: standalone)").matches ? "" : `<button class="btn sm" data-act="install">📲 Встановити як застосунок</button>`}</div>
+      ${window.skybeeDesktop || isNative || matchMedia("(display-mode: standalone)").matches ? "" : `<button class="btn sm" data-act="install">Встановити як застосунок</button>`}</div>
     ${window.skybeeDesktop?.update || isNative ? `<div class="card"><h3>Оновлення</h3>
       <p class="small muted" id="appver">Версія застосунку: …</p>
       <div id="betabox" hidden>${toggle("beta", "Бета-тестування", false, "Нові версії Skybee раніше за всіх — з кожною зміною в коді. Можуть траплятися помилки: пиши про них на GitHub. Якщо вимкнеш, залишишся на беті, доки не вийде новіша звичайна версія.")}</div>
       <button class="btn sm" id="checkupd">Перевірити оновлення</button>
       <p class="small" id="updres" hidden></p>
-      <button class="btn sm" id="getupd" hidden>⬇ Завантажити</button></div>` : ""}
+      <button class="btn sm" id="getupd" hidden>Завантажити</button></div>` : ""}
     <div class="card"><h3>Цей пристрій</h3>
       <button class="ghost sm" id="clearcache">Очистити кеш застосунку</button>
       <p class="small muted">Допомагає, якщо після оновлення щось виглядає дивно. Акаунти й налаштування залишаться.</p>
