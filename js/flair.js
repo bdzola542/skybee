@@ -28,7 +28,13 @@ const cut = (s, n) => (typeof s === "string" ? s.trim().slice(0, n) : "");
 // text that reads on the plain colour: dark on yellow and the like, white on the rest
 const lum = (c) => { const [r, g, b] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16)); return (r * 299 + g * 587 + b * 114) / 1000; };
 // for a gradient: what reads on both ends of it
-export const inkFor = (c, c2 = c) => ((lum(c) + lum(c2)) / 2 > 160 ? "#14110a" : "#ffffff");
+// (by the real WCAG contrast with the worse end of the gradient, not by a brightness threshold)
+const rl = (c) => { const f = (i) => { const v = parseInt(c.slice(i, i + 2), 16) / 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }; return .2126 * f(1) + .7152 * f(3) + .0722 * f(5); };
+export const inkFor = (c, c2 = c) => {
+  const worst = Math.max(rl(c), rl(c2)), best = Math.min(rl(c), rl(c2));
+  const white = 1.05 / (worst + .05), dark = (best + .05) / (.0066 + .05); // against #14110a
+  return dark >= white ? "#14110a" : "#ffffff";
+};
 // the colours of a record: [from, to, third or ""], or null
 export const colorsOf = (rec) => (rec?.color ? [rec.color, rec.color2 || rec.color, rec.color3 || ""] : null);
 export const gradientName = (c1, c2) => GRADIENTS.find(([a, b]) => a === c1 && b === c2)?.[2] || "";
@@ -105,7 +111,7 @@ function streamPicker(title, artist, url) {
     ["YouTube Music", `https://music.youtube.com/search?q=${q}`], ["Deezer", `https://www.deezer.com/search/${q}`]];
   stopAudio();
   const m = modal(`<h3>${pl ? "Слухати в Apple Music" : "Слухати в…"}</h3><p class="muted small noi18n">${esc(artist ? artist + " — " : "")}${esc(title)}</p>
-    ${pl ? `<iframe class="sb-embed" src="${esc(pl.src)}" style="width:100%;height:${pl.height}px;border:0;border-radius:12px;margin:4px 0 10px" allow="autoplay; encrypted-media; fullscreen; clipboard-write" referrerpolicy="strict-origin-when-cross-origin" loading="lazy" title="Apple Music"></iframe><p class="muted small">Без підписки Apple Music грає уривок; з підпискою — увійдіть у плеєрі, і він грає повністю.</p>` : ""}
+    ${pl ? `<iframe class="sb-embed" src="${esc(pl.src)}" style="width:100%;height:min(${pl.height}px,45vh);border:0;border-radius:12px;margin:4px 0 10px" allow="autoplay; encrypted-media; fullscreen; clipboard-write" referrerpolicy="strict-origin-when-cross-origin" loading="lazy" title="Apple Music"></iframe><p class="muted small">Без підписки Apple Music грає уривок; з підпискою — увійдіть у плеєрі, і він грає повністю.</p>` : ""}
     <div style="display:flex;flex-direction:column;gap:8px">${S.map(([n, u]) => `<a class="btn ghost" href="${esc(u)}" target="_blank" rel="noopener">${n}</a>`).join("")}
     ${url ? `<a class="ghost small" href="${esc(url)}" target="_blank" rel="noopener">Відкрити за посиланням профілю</a>` : ""}</div>
     <div class="row end"><button class="ghost" data-x="0">Закрити</button></div>`);
@@ -226,7 +232,7 @@ async function searchTracks(term) {
   // Apple first (covers + 30-second previews); if it cannot be reached from here (CORS, a blocked host) → MusicBrainz, an open catalogue without a key
   // (no preview, the cover comes from the Cover Art Archive)
   try {
-    const r = await fetch(`https://itunes.apple.com/search?media=music&entity=song&limit=15&term=${encodeURIComponent(term)}`);
+    const r = await fetch(`https://itunes.apple.com/search?media=music&entity=song&limit=25&term=${encodeURIComponent(term)}`);
     if (!r.ok) throw new Error("http " + r.status);
     const d = await r.json();
     return (d.results || []).filter(t => t.trackName && isHttps(t.trackViewUrl)).map(t => ({
@@ -246,7 +252,28 @@ async function searchTracks(term) {
   } catch { throw new Error("Немає з'єднання з каталогом музики"); }
 }
 // A pasted streaming link → title, artist, cover. song.link knows most services; oEmbed is the fallback.
+// An Apple Music link (album, or a song of it with ?i=) goes straight to the iTunes lookup: it needs no key, answers any browser (CORS)
+// and does not depend on song.link, which often fails or finds nothing
+async function appleTrack(url) {
+  let u; try { u = new URL(url); } catch { return null; }
+  if (u.hostname !== "music.apple.com") return null;
+  const country = /^\/([a-z]{2})\//.exec(u.pathname)?.[1] || "us";
+  // only albums and songs: an artist or a video link would lead to a random track
+  const song = u.searchParams.get("i"), album = /^\/[a-z]{2}\/album\/[^/]*\/(?:id)?(\d{5,})\/?$/.exec(u.pathname)?.[1] || /^\/[a-z]{2}\/song\/[^/]*\/(?:id)?(\d{5,})\/?$/.exec(u.pathname)?.[1];
+  const id = song || album;
+  if (!/^\d+$/.test(id || "")) return null;
+  try {
+    const r = await fetch(`https://itunes.apple.com/lookup?id=${id}&country=${country}${song ? "" : "&entity=song&limit=1"}`);
+    if (!r.ok) return null;
+    const t = ((await r.json()).results || []).find(x => x.trackName);
+    if (!t) return null;
+    return { url, title: cut(t.trackName, 120), artist: cut(t.artistName, 120),
+      cover: media((t.artworkUrl100 || "").replace("100x100", "300x300")), preview: media(t.previewUrl) };
+  } catch { return null; }
+}
 async function lookupTrack(url) {
+  const apple = await appleTrack(url);
+  if (apple) return apple;
   try {
     const d = await (await fetch(`https://api.song.link/v1-alpha.1/links?url=${encodeURIComponent(url)}`)).json();
     const e = d.entitiesByUniqueId?.[d.entityUniqueId];
