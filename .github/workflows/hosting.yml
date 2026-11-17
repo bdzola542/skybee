@@ -76,12 +76,15 @@ jobs:
             mkdir -p ~/.ssh && printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           fi
           # без --delete: якщо HOSTING_DIR вказано не ту теку, нічого чужого не зітреться.
-          # index.html і sw.js — останніми, щоб відвідувач не отримав нову оболонку зі старими js
+          # index.html і sw.js — останніми, щоб відвідувач не отримав нову оболонку зі старими js.
+          # (-X index.html виключає такі файли в усіх теках, тож index.html підсторінок заливаються окремо нижче)
           lftp -c "
             set net:max-retries 3; set net:timeout 30;
             set ftp:ssl-force true; set ftp:ssl-protect-data true; set ssl:verify-certificate yes;
             open --env-password -u \"$LOGIN\" $PROTO://$HOST;
             mirror -R --verbose --parallel=4 -X index.html -X sw.js site/ \"${DIR:-.}\";
             cd \"${DIR:-.}\";
+            put -O bluesky-klient site/bluesky-klient/index.html;
+            put -O bluesky-client site/bluesky-client/index.html;
             put site/sw.js; put site/index.html
           "
