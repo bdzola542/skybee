@@ -187,7 +187,7 @@ jobs:
       - name: Збірка IPA (без підпису)
         run: |
           V=$(node -p "require('./package.json').version")
-          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphoneos \
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos \
             -destination 'generic/platform=iOS' -derivedDataPath build \
             MARKETING_VERSION=$V CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES="$ICONS" \
