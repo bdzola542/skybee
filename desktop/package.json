@@ -18,7 +18,7 @@
     "dist:linux": "npm run web && electron-builder --linux --x64 --publish never"
   },
   "devDependencies": {
-    "electron": "45.3.1",
+    "electron": "45.3.2",
     "electron-builder": "26.18.0"
   },
   "build": {
