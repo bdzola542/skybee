@@ -173,6 +173,9 @@ jobs:
           plutil -replace NSCameraUsageDescription -string "Щоб зняти фото чи відео для поста" $P
           plutil -replace NSMicrophoneUsageDescription -string "Щоб записати відео зі звуком" $P
           plutil -replace NSPhotoLibraryAddUsageDescription -string "Щоб зберігати фото з постів" $P
+          # як у Bluesky в «Параметрах»: фонове оновлення, дії наживо (значки з'являються в налаштуваннях програми)
+          plutil -replace UIBackgroundModes -json '["fetch","remote-notification"]' $P
+          plutil -replace NSSupportsLiveActivities -bool true $P
           plutil -replace CFBundleDisplayName -string "Skybee" $P
           plutil -replace CFBundleURLTypes -json '[{"CFBundleURLName":"io.github.vysocavnu.skybee","CFBundleURLSchemes":["skybee"]}]' $P
           plutil -p $P | grep -A3 CFBundleURLTypes

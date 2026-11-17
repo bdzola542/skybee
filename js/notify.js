@@ -20,12 +20,20 @@ const setItem = (k, v) => { try { v == null ? localStorage.removeItem(k) : local
 // per account: the newest notification (n) and chat message (c) already handled, as ISO timestamps
 const markKey = () => `skybee.notified.${api.session.did}`;
 
-export const supported = () => "Notification" in window;
-export const enabled = () => supported() && Notification.permission === "granted" && getItem(KEY) === "1";
+// In the Android/iOS app the system asks through the LocalNotifications plugin (then «Сповіщення» appears in the phone's settings for Skybee)
+const LN = () => window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins?.LocalNotifications : null;
+export const supported = () => !!LN() || "Notification" in window;
+export const enabled = () => supported() && (LN() || Notification.permission === "granted") && getItem(KEY) === "1";
+let lnHooked = false;
 
 export async function enable() {
   if (!supported()) return false;
-  if (Notification.permission !== "granted" && await Notification.requestPermission() !== "granted") return false;
+  const ln = LN();
+  if (ln) {
+    let p = await ln.checkPermissions().catch(() => null);
+    if (p?.display !== "granted") p = await ln.requestPermissions().catch(() => null);
+    if (p?.display !== "granted") return false;
+  } else if (Notification.permission !== "granted" && await Notification.requestPermission() !== "granted") return false;
   const now = new Date().toISOString();
   setItem(KEY, "1"); setItem(markKey(), JSON.stringify({ n: now, c: now })); // only what arrives from now on
   show("Skybee", t("Сповіщення увімкнено"), "#/notifications", "skybee-on");
@@ -35,6 +43,12 @@ export const disable = () => setItem(KEY, null);
 
 export async function show(title, body, hash, tag) {
   title = t(title); // the body is someone's post or message: never translated
+  const ln = LN();
+  if (ln) {
+    if (!lnHooked) { lnHooked = true; ln.addListener?.("localNotificationActionPerformed", (e) => { const h = e?.notification?.extra?.hash; if (typeof h === "string" && h.startsWith("#/")) location.hash = h; }); }
+    const id = Math.floor(Math.random() * 2e9) + 1;
+    try { return await ln.schedule({ notifications: [{ id, title, body: body || "", extra: { hash } }] }); } catch { return; }
+  }
   const opts = { body, tag, icon: "icons/icon-192.png", data: { hash } };
   try {
     const reg = await navigator.serviceWorker?.getRegistration();
