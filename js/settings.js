@@ -87,8 +87,7 @@ export async function index(el) {
       ${row("#/settings/notifs", "bell", "Сповіщення")}
       ${row("#/settings/media", "media", "Вміст і медіа")}
       ${row("#/settings/appearance", "brush", "Оформлення")}
-      ${row("#/settings/analytics", "media", "📊 Аналітика")}
-      ${row("#/tools", "media", "🧰 Інструменти: аналітика, статистика, синхронізація")}
+      ${row("#/settings/analytics", "chart", "Аналітика та інструменти")}
       ${row("#/settings/a11y", "a11y", "Доступність")}
       ${row("#/settings/langs", "globe", "Мови")}
       ${row("#/settings/help", "help", "Довідка")}
@@ -630,11 +629,13 @@ export async function langs(el) {
 // an independent free service (not Bluesky). Its pages open in the app's own browser window.
 const BSC = "https://bskycheck.com/";
 export async function analytics(el) {
-  el.innerHTML = header("Аналітика", true) + `
+  el.innerHTML = header("Аналітика та інструменти", true) + `
     <div class="sgroup">
       ${row("#/tools/stats", "media", "📊 Статистика мого профілю: лайки, активність, найкращі пости")}
       ${row("#/tools/follows", "users", "👥 Підписки: хто не підписаний у відповідь, хто відписався")}
       ${row("#/settings/blocked-by", "shield", "⛔ Хто мене заблокував")}
+      <button class="srow" data-tool="friends"><span class="grow">🔎 Знайти знайомих зі списку (X, Mastodon…)</span></button>
+      <button class="srow" data-tool="sync"><span class="grow">☁️ Налаштування Skybee між пристроями</span></button>
     </div>
     <div class="card"><h3>Bluesky загалом — bskycheck</h3>
       <p class="small muted">Незалежний безкоштовний сервіс (не Bluesky): живі дані з відкритого потоку Bluesky. Сторінки відкриваються у вікні застосунку.</p>
@@ -646,6 +647,10 @@ export async function analytics(el) {
     <div class="card"><h3>Перевірка акаунта на бота</h3>
       <p class="small muted">Нік скопіюється, а на сторінці bskycheck його лишається вставити (3 перевірки на день без входу).</p>
       <div class="row" style="gap:8px"><input id="botq" class="grow" placeholder="нік.bsky.social" maxlength="253" autocomplete="off" value="${esc(api.session?.handle || "")}"><button class="btn" id="botgo">Перевірити</button></div></div>`;
+  el.addEventListener("click", async (e) => {
+    const t = e.target.closest("[data-tool]")?.dataset.tool; if (!t) return;
+    const m = await import("./tools.js"); if (t === "friends") m.findFriends(); else m.syncDialog();
+  });
   $("#botgo", el).onclick = async () => {
     const h = $("#botq", el).value.trim().replace(/^@/, "");
     try { await navigator.clipboard.writeText(h); toast("Нік скопійовано — вставте його на сторінці"); } catch {}

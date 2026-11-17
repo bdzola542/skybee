@@ -57,6 +57,7 @@ const ICO = {
   grid: '<rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/>',
   rows: '<rect x="4" y="4.5" width="16" height="6.5" rx="2"/><rect x="4" y="13" width="16" height="6.5" rx="2"/>',
   info: '<rect x="4" y="4" width="16" height="14" rx="1.5"/><path d="M9 18l3 3 3-3M12 8v.01M12 11v4"/>',
+  chart: '<path d="M5 20V11M12 20V4M19 20v-6"/>',
 };
 // The same icons drawn in the manner of each platform (css shows the set of the chosen interface style, «Стиль інтерфейсу»):
 // Liquid Glass — thin, round, SF-Symbols-like, filled when active; Material — Material Symbols-like, heavier, square-ish shapes.
@@ -85,6 +86,7 @@ const ICO_GL = {
   globe: '<circle cx="12" cy="12" r="8.8"/><path d="M3.2 12h17.6M12 3.2c3 3.2 3 14.4 0 17.6M12 3.2c-3 3.2-3 14.4 0 17.6"/>',
   help: '<circle cx="12" cy="12" r="8.8"/><path d="M9.6 9.6a2.4 2.4 0 1 1 3.4 2.2c-.7.3-1 .9-1 1.6M12 16.8v.01"/>',
   info: '<rect x="4" y="4.5" width="16" height="12.5" rx="3"/><path d="M9.5 17l2.5 3 2.5-3"/>',
+  chart: '<path d="M5 20V11M12 20V4M19 20v-6"/>',
 };
 const ICO_MT = {
   home: '<path d="M4 10.5L12 4l8 6.5V20h-5.5v-6h-5v6H4z"/>',
@@ -106,6 +108,7 @@ const ICO_MT = {
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3.2 3.2 3.2 14.8 0 18M12 3c-3.2 3.2-3.2 14.8 0 18"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.1 1-1.1 1.8M12 17v.01"/>',
   info: '<rect x="3" y="4" width="18" height="14"/><path d="M8 18l4 3 4-3"/>',
+  chart: '<path d="M5 20V11M12 20V4M19 20v-6"/>',
 };
 export const ico = (n, size = 24) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" style="width:${size}px;height:${size}px"><g class="i-sb">${ICO[n] || ""}</g>${ICO_GL[n] ? `<g class="i-gl">${ICO_GL[n]}</g>` : ""}${ICO_MT[n] ? `<g class="i-mt">${ICO_MT[n]}</g>` : ""}</svg>`;
 // the gradient every bee uses, put into the page once
