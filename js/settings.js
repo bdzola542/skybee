@@ -494,6 +494,8 @@ export function applyLook() {
   // interface style: Liquid Glass (iPhone by default) or Material Design (Android by default), each with its own options
   const ui = uiStyle();
   root.dataset.ui = ui;
+  root.dataset.fontFamily = "zakon";
+  root.dataset.fontStyle = ["regular", "italic", "bold", "bolditalic"].includes(store.get("skybee.fontStyle")) ? store.get("skybee.fontStyle") : "regular";
   root.dataset.glass = store.get("skybee.glass") || "normal";
   root.classList.toggle("glass-float", store.get("skybee.glassFloat") !== "0");
   // refraction needs backdrop-filter: url(…), which only Chromium draws (desktop app, Android, Chrome); Safari would drop the blur too
@@ -525,6 +527,7 @@ export async function appearance(el) {
         ${seg("ibg", [["", "Світла"], ["dim", "Сутінки"], ["dark", "Темна"]], ibg)}<div class="sb-icons">${[["", "Золота — як є"], ...APP_COLORS.filter(([c]) => !isNative || ICON_COLORS.includes(c))].map(([c, n]) => `<button type="button" class="sb-ic${c === icolor ? " on" : ""}" data-icon="${c}" title="${n}" aria-label="${n}"><img alt="" src="${svgUrl(beeSvg(c, true, 112, ibg))}"></button>`).join("")}${isNative ? "" : `<label class="sb-ic sb-any${icolor && !APP_COLORS.some(([c]) => c === icolor) ? " on" : ""}" title="Свій колір"><input type="color" data-anyicon value="${icolor || "#ff4d4d"}">${icolor && !APP_COLORS.some(([c]) => c === icolor) ? `<img alt="" src="${svgUrl(beeSvg(icolor, true, 112, ibg))}">` : "<b>+</b>"}</label>`}</div></div>
       <div class="card"><h3>Вигляд стрічки</h3><p class="muted small">«Компактний» — багато постів на екрані, дрібні відступи й картинки. «Мозаїка» — режим сітки ▦ показує фото різної висоти, як Pinterest.</p>
         ${seg("fl", [["", "Звичайний"], ["compact", "Компактний"], ["mosaic", "Мозаїка"]], store.get("skybee.feedLook") || "")}</div>
+      <div class="card"><h3>Шрифт Zakon</h3><p class="muted small">Національний шрифт Zakon для всього інтерфейсу. Обери накреслення:</p>${seg("fontstyle", [["regular", "Regular"], ["italic", "Regular Italic"], ["bold", "Bold"], ["bolditalic", "Bold Italic"]], store.get("skybee.fontStyle") || "regular")}</div>
       <div class="card"><h3>Розмір тексту</h3>${seg("font", [["14", "Менший"], ["15", "Звичайний"], ["17", "Більший"], ["19", "Великий"]], font)}</div>
       ${window.skybeeDesktop || window.Capacitor?.isNativePlatform?.() ? `<div class="card"><h3>Анімація запуску</h3>
         <p class="muted small">Бджола пролітає над лукою й сідає в логотип. Небо — за темою (уночі місяць і зорі) і кольором застосунку.</p>
@@ -555,6 +558,7 @@ export async function appearance(el) {
     const anyI = el.querySelector("[data-anyicon]");
     if (anyI) anyI.onchange = () => { setIconColor(anyI.value); draw(); };
     el.querySelectorAll("[data-font]").forEach(b => b.onclick = () => { store.set("skybee.font", b.dataset.font); applyLook(); draw(); });
+    el.querySelectorAll("[data-fontstyle]").forEach(b => b.onclick = () => { store.set("skybee.fontStyle", b.dataset.fontstyle); applyLook(); draw(); });
     el.querySelectorAll("[data-fl]").forEach(b => b.onclick = () => { store.set("skybee.feedLook", b.dataset.fl || null); applyLook(); draw(); });
     el.querySelectorAll("[data-intro]").forEach(b => b.onclick = () => { store.set("skybee.intro", b.dataset.intro === "full" ? null : b.dataset.intro); draw(); });
     el.querySelectorAll("[data-ui]").forEach(b => b.onclick = () => { store.set("skybee.ui", b.dataset.ui === "auto" ? null : b.dataset.ui); applyLook(); draw(); });
