@@ -38,7 +38,7 @@ export async function enable(password) {
   const { key: vapid } = await vr.json();
   try { await (await reg.pushManager.getSubscription())?.unsubscribe(); } catch {} // стара підписка могла бути з іншим ключем сервера
   const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(vapid) });
-  const d = await call("subscribe", { handle: api.session.handle, password, subscription: sub.toJSON(), lang: uiLang.startsWith("uk") ? "uk" : "en" });
+  const d = await call("subscribe", { handle: api.session.handle, password, subscription: sub.toJSON(), lang: /^(uk|rue)/.test(uiLang) ? "uk" : "en" });
   setItem(key(), d.token);
   return { chat: !!d.chat };
 }
