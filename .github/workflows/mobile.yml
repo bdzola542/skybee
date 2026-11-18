@@ -11,7 +11,7 @@ on:
   push:
     tags: ["v*"]
     branches: ["main"] # лише main: інакше кожна зміна збиралася двічі (гілка + злиття) і гілка перезаписувала тестові релізи
-    paths: ["mobile/**", "scripts/dist.mjs", "scripts/app-icons.mjs", ".github/workflows/mobile.yml", "index.html", "css/**", "js/**", "icons/**"]
+    paths: ["mobile/**", "scripts/dist.mjs", "scripts/app-icons.mjs", ".github/workflows/mobile.yml", "index.html", "css/**", "js/**", "icons/**", "fonts/**"]
   workflow_dispatch:
     inputs:
       version:
