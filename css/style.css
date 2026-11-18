@@ -1966,7 +1966,12 @@ article.post[hidden], article.post.bm-out { display: none !important; }
 :root[data-font-family="zakon"] button,
 :root[data-font-family="zakon"] input,
 :root[data-font-family="zakon"] textarea,
-:root[data-font-family="zakon"] select { font-family: "Zakon", system-ui, sans-serif !important; }
+:root[data-font-family="zakon"] select,
+:root[data-font-family="custom"] body,
+:root[data-font-family="custom"] button,
+:root[data-font-family="custom"] input,
+:root[data-font-family="custom"] textarea,
+:root[data-font-family="custom"] select { font-family: var(--skybee-font-family, "Zakon"), system-ui, sans-serif !important; }
 :root[data-font-style="regular"] body { font-style: normal; font-weight: 400; }
 :root[data-font-style="italic"] body { font-style: italic; font-weight: 400; }
 :root[data-font-style="bold"] body { font-style: normal; font-weight: 700; }
