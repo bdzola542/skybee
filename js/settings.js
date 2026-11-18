@@ -609,8 +609,13 @@ export async function appearance(el) {
     el.querySelectorAll("[data-font]").forEach(b => b.onclick = () => { store.set("skybee.font", b.dataset.font); applyLook(); draw(); });
     el.querySelectorAll("[data-fontstyle]").forEach(b => b.onclick = () => { store.set("skybee.fontStyle", b.dataset.fontstyle); applyLook(); draw(); });
     el.querySelectorAll("[data-fontfamily]").forEach(b => b.onclick = () => {
-      if (b.dataset.fontfamily === "zakon") store.set("skybee.fontFamily", "zakon");
-      else if (userFonts.length) store.set("skybee.fontFamily", "custom:" + userFonts[0].id);
+      if (b.dataset.fontfamily === "zakon") {
+        store.set("skybee.fontFamily", "zakon");
+        activeUserFont = "";
+        document.documentElement.style.removeProperty("--skybee-font-family");
+      } else if (userFonts.length) {
+        store.set("skybee.fontFamily", "custom:" + (el.querySelector("#userFontChoice")?.value || userFonts[0].id));
+      }
       applyLook(); draw();
     });
     el.querySelector("#userFontChoice")?.addEventListener("change", e => {
@@ -636,7 +641,8 @@ export async function appearance(el) {
       await removeUserFont(id);
       userFonts = userFonts.filter(f => f.id !== id);
       if (store.get("skybee.fontFamily") === "custom:" + id) store.set("skybee.fontFamily", "zakon");
-      activeUserFont = ""; document.documentElement.style.removeProperty("--skybee-font-family");
+      activeUserFont = "";
+      document.documentElement.style.removeProperty("--skybee-font-family");
       applyLook(); await appearance(el);
     });
     el.querySelectorAll("[data-fl]").forEach(b => b.onclick = () => { store.set("skybee.feedLook", b.dataset.fl || null); applyLook(); draw(); });
