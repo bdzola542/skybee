@@ -398,6 +398,25 @@ export async function profile(el, { actor, tab = "posts" }) {
     ${blocked ? empty(v.blocking ? "Ви заблокували цей акаунт" : "Цей акаунт заблокував вас") :
       `<div class="tabs scroll">${tabs.map(([k, l]) => `<a class="${k === tab ? "on" : ""}" href="${profileHref(p)}${k === "posts" ? "" : "/" + k}">${l}</a>`).join("")}</div><div id="pbody"></div>`}`;
   if (blocked) return;
+  // a swipe sideways over the profile switches the tab (posts ↔ replies ↔ media …); not from the left edge (that is «Back»)
+  if (el.isConnected) {
+    el._swipe?.abort();
+    el._swipe = new AbortController();
+    const o = { passive: true, signal: el._swipe.signal };
+    let t0 = null;
+    el.addEventListener("touchstart", (e) => {
+      const t = e.touches[0];
+      t0 = e.touches.length === 1 && t.clientX > 28 && !e.target.closest(".tabs, .scroll, .carousel, .gallery, video, iframe, input, textarea, pre, table, [data-noswipe]") && !String(getSelection()).length ? { x: t.clientX, y: t.clientY } : null;
+    }, o);
+    el.addEventListener("touchend", (e) => {
+      if (!t0) return;
+      const t = e.changedTouches[0], dx = t.clientX - t0.x, dy = t.clientY - t0.y; t0 = null;
+      if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+      const n = tabs[tabs.findIndex(([k]) => k === tab) + (dx < 0 ? 1 : -1)];
+      if (n) location.hash = `${profileHref(p)}${n[0] === "posts" ? "" : "/" + n[0]}`;
+    }, o);
+    el.addEventListener("touchcancel", () => { t0 = null; }, o);
+  }
   if (!p.createdAt) joinedFromLog(p.did).then(d => { const j = $("[data-joined]", el); if (d && j) j.innerHTML = joinedLine(d); }).catch(() => {});
   flair.decorate(el, p); // Skybee extras arrive on their own, the page does not wait for them
   if (p.associated?.labeler && session) labelerCard($(".phead", el), p).catch(() => {});

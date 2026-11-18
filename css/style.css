@@ -1952,8 +1952,10 @@ img.imgbroken { object-fit: contain !important; padding: 12%; background: color-
 .lfilter { width: 100%; box-sizing: border-box; padding: 9px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card, transparent); color: var(--text); font: inherit; }
 article.post[hidden], article.post.bm-out { display: none !important; }
 .ltime { color: var(--muted); font-size: .92em; }
-.sb-badge { display: inline-flex; vertical-align: -2px; margin-left: 4px; }
-.sb-badge svg { display: block; }
+.sb-badge { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-left: 4px; flex: none !important; overflow: visible !important; line-height: 1; position: relative; top: -1px; }
+.phead h1 .sb-badge svg { width: .8em !important; height: .8em !important; }
+.sb-badge svg { display: block; width: 1.05em !important; height: 1.05em !important; min-width: 14px; min-height: 14px; }
+.phead h1 .sb-badge svg { width: .8em !important; height: .8em !important; }
 
 
 /* ---------- Zakon national typeface ---------- */

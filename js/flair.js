@@ -101,7 +101,7 @@ function togglePreview(btn, src) {
 }
 const trackCard = (m, cls = "") => `<div class="sb-music ${cls}">
   ${m.cover ? `<img src="${esc(m.cover)}" alt="" loading="lazy">` : `<span class="sb-note">🎵</span>`}
-  <a class="grow sb-song" href="${esc(m.url)}" target="_blank" rel="noopener" data-title="${esc(m.title)}" data-artist="${esc(m.artist || "")}" title="Слухати в стрімінговому сервісі"><b class="clip">${esc(m.title)}</b><span class="muted small clip">${esc(m.artist || "Музика")}</span></a>
+  <a class="grow sb-song" href="${esc(m.url)}"${/\bflat\b/.test(cls) ? ` target="_blank"` : ""} rel="noopener" data-title="${esc(m.title)}" data-artist="${esc(m.artist || "")}" title="Слухати в стрімінговому сервісі"><b class="clip">${esc(m.title)}</b><span class="muted small clip">${esc(m.artist || "Музика")}</span></a>
   ${m.preview ? `<button type="button" class="sb-play" data-preview="${esc(m.preview)}" title="Послухати уривок">▶</button>` : `<a class="sb-play" href="${esc(m.url)}" target="_blank" rel="noopener" title="Слухати">▶</a>`}</div>`;
 // A tap on the song itself (not on ▶): which service to listen in. The song is looked up on every service (song.link),
 // and each one plays RIGHT HERE in the official embedded player (Spotify, Apple Music, YouTube, Deezer); ↗ opens the service
