@@ -10,6 +10,25 @@
 export const UI_LANGS = [
   ["uk", "Українська (правопис 2019)", "uk"],
   ["uk-x-1928", "Українська (харківський правопис 1928)", "uk", () => import("./i18n/uk-1928.js")],
+  ["uk-x-zhelekh", "Українська (желехівка 1886)", "uk", () => import("./i18n/uk-x-zhelekh.js")],
+  ["uk-x-kulish", "Українська (кулішівка 1856)", "uk", () => import("./i18n/uk-x-kulish.js")],
+  ["uk-x-diaspora", "Українська (діаспорний правопис)", "uk", () => import("./i18n/uk-x-diaspora.js")],
+  ["uk-x-halych", "Галицький говір", "uk", () => import("./i18n/uk-x-halych.js")],
+  ["uk-x-hutsul", "Гуцульський говір", "uk", () => import("./i18n/uk-x-hutsul.js")],
+  ["uk-x-boiko", "Бойківський говір", "uk", () => import("./i18n/uk-x-boiko.js")],
+  ["uk-x-lemko", "Лемківський говір", "uk", () => import("./i18n/uk-x-lemko.js")],
+  ["uk-x-zakarp", "Закарпатський говір", "uk", () => import("./i18n/uk-x-zakarp.js")],
+  ["uk-x-volyn", "Волинський говір", "uk", () => import("./i18n/uk-x-volyn.js")],
+  ["uk-x-podil", "Подільський говір", "uk", () => import("./i18n/uk-x-podil.js")],
+  ["uk-x-polis", "Поліський говір", "uk", () => import("./i18n/uk-x-polis.js")],
+  ["uk-x-slobozh", "Слобожанський говір", "uk", () => import("./i18n/uk-x-slobozh.js")],
+  ["uk-x-step", "Степовий говір", "uk", () => import("./i18n/uk-x-step.js")],
+  ["uk-x-naddn", "Середньонаддніпрянський говір", "uk", () => import("./i18n/uk-x-naddn.js")],
+  ["uk-x-surzhyk", "Суржик (жартівливий)", "uk", () => import("./i18n/uk-x-surzhyk.js")],
+  ["rue-x-presov", "Русинська (пряшівська)", "uk", () => import("./i18n/rue-x-presov.js")],
+  ["rue-x-zakarp", "Русинська (закарпатська)", "uk", () => import("./i18n/rue-x-zakarp.js")],
+  ["rue-x-pannon", "Русинська (паннонська)", "uk", () => import("./i18n/rue-x-pannon.js")],
+  ["rue-x-lemko", "Русинська (лемківська)", "uk", () => import("./i18n/rue-x-lemko.js")],
   ["en", "English", "eu", () => import("./i18n/en.js")],
   ["pl", "Polski", "eu", () => import("./i18n/pl.js")],
   ["de", "Deutsch", "eu", () => import("./i18n/de.js")],
@@ -23,11 +42,46 @@ export const UI_LANGS = [
   ["ro", "Română", "eu", () => import("./i18n/ro.js")],
   ["bg", "Български", "eu", () => import("./i18n/bg.js")],
   ["crh", "Qırımtatarca", "eu", () => import("./i18n/crh.js")],
+  ["el", "Ελληνικά", "eu", () => import("./i18n/el.js")],
+  ["hu", "Magyar", "eu", () => import("./i18n/hu.js")],
+  ["sv", "Svenska", "eu", () => import("./i18n/sv.js")],
+  ["da", "Dansk", "eu", () => import("./i18n/da.js")],
+  ["nb", "Norsk bokmål", "eu", () => import("./i18n/nb.js")],
+  ["fi", "Suomi", "eu", () => import("./i18n/fi.js")],
+  ["lt", "Lietuvių", "eu", () => import("./i18n/lt.js")],
+  ["lv", "Latviešu", "eu", () => import("./i18n/lv.js")],
+  ["is", "Íslenska", "eu", () => import("./i18n/is.js")],
+  ["et", "Eesti", "eu", () => import("./i18n/et.js")],
+  ["hr", "Hrvatski", "eu", () => import("./i18n/hr.js")],
+  ["sr", "Српски", "eu", () => import("./i18n/sr.js")],
+  ["sl", "Slovenščina", "eu", () => import("./i18n/sl.js")],
+  ["bs", "Bosanski", "eu", () => import("./i18n/bs.js")],
+  ["mk", "Македонски", "eu", () => import("./i18n/mk.js")],
+  ["sq", "Shqip", "eu", () => import("./i18n/sq.js")],
+  ["be", "Беларуская", "eu", () => import("./i18n/be.js")],
+  ["be-Latn", "Biełaruskaja (łacinka)", "eu", () => import("./i18n/be-latn.js")],
+  ["ga", "Gaeilge", "eu", () => import("./i18n/ga.js")],
+  ["mt", "Malti", "eu", () => import("./i18n/mt.js")],
+  ["lb", "Lëtzebuergesch", "eu", () => import("./i18n/lb.js")],
+  ["ca", "Català", "eu", () => import("./i18n/ca.js")],
+  ["eu", "Euskara", "eu", () => import("./i18n/eu.js")],
+  ["gl", "Galego", "eu", () => import("./i18n/gl.js")],
+  ["cy", "Cymraeg", "eu", () => import("./i18n/cy.js")],
+  ["fo", "Føroyskt", "eu", () => import("./i18n/fo.js")],
+  ["gd", "Gàidhlig", "eu", () => import("./i18n/gd.js")],
+  ["tr", "Türkçe", "eu", () => import("./i18n/tr.js")],
+  ["ka", "ქართული", "eu", () => import("./i18n/ka.js")],
+  ["hy", "Հայերեն", "eu", () => import("./i18n/hy.js")],
+  ["fy", "Frysk", "eu", () => import("./i18n/fy.js")],
 ];
 // Language lists go A–Z by the Ukrainian name of the language (the labels themselves stay in each language's own words)
 const UK_NAME = { uk: "Українська", "uk-x-1928": "Українська (1928)", en: "Англійська", pl: "Польська", de: "Німецька", fr: "Французька", es: "Іспанська",
   it: "Італійська", cs: "Чеська", sk: "Словацька", pt: "Португальська", nl: "Нідерландська", ro: "Румунська", bg: "Болгарська", crh: "Кримськотатарська",
-  be: "Білоруська", ru: "Російська", ja: "Японська" };
+  el: "Грецька", hu: "Угорська", sv: "Шведська", da: "Данська", nb: "Норвезька", fi: "Фінська", lt: "Литовська", lv: "Латвійська",
+  is: "Ісландська", et: "Естонська", hr: "Хорватська", sr: "Сербська", sl: "Словенська", bs: "Боснійська", mk: "Македонська", sq: "Албанська",
+  ga: "Ірландська", mt: "Мальтійська", lb: "Люксембурзька", ca: "Каталанська", eu: "Баскська", gl: "Галісійська", cy: "Валлійська",
+  fo: "Фарерська", gd: "Шотландська гельська", tr: "Турецька", ka: "Грузинська", hy: "Вірменська", fy: "Фризька",
+  be: "Білоруська", "be-Latn": "Білоруська (латинка)", ru: "Російська", ja: "Японська" };
 export const sortAZ = (list) => [...list].sort((a, b) => (UK_NAME[a[0]] || a[1]).localeCompare(UK_NAME[b[0]] || b[1], "uk"));
 UI_LANGS.splice(0, UI_LANGS.length, ...sortAZ(UI_LANGS));
 // languages of the «eu» group fall back to English where their dictionary has no line yet (not to Ukrainian)
@@ -37,13 +91,14 @@ const KEY = "skybee.ui.lang";
 const read = () => { try { return localStorage.getItem(KEY) || ""; } catch { return ""; } };
 const known = (c) => UI_LANGS.some(l => l[0] === c);
 // nothing chosen yet: the browser's language if Skybee speaks it, else Ukrainian
-const auto = () => { for (const l of navigator.languages || []) { const b = String(l).toLowerCase().split("-")[0]; if (b === "uk" || b === "ru" || b === "be") return "uk"; if (known(b)) return b; } return "uk"; };
+const ALIAS = { no: "nb", nn: "nb", sh: "hr", rue: "uk-x-lemko" };
+const auto = () => { for (const l of navigator.languages || []) { const full = String(l), b = full.toLowerCase().split("-")[0]; if (b === "uk" || b === "ru") return "uk"; if (known(full)) return full; if (known(ALIAS[b] || b)) return ALIAS[b] || b; } return "uk"; };
 export const uiLang = known(read()) ? read() : auto();
 export const setUiLang = (c) => { try { localStorage.setItem(KEY, c); } catch {} };
 // locale for dates and numbers (private-use tags like uk-x-1928 → uk)
 // the «Для новеньких» guide is about Ukrainian Bluesky: only for Ukrainian and its spellings/dialects
 export const isUk = UI_LANGS.find(l => l[0] === uiLang)?.[2] === "uk";
-export const locale = uiLang.split("-x-")[0];
+export const locale = uiLang.split("-x-")[0].replace("-Latn", "").replace(/^rue$/, "uk"); // Rusyn: dates as in uk (no own CLDR data in every browser) // be-Latn (łacinka) → dates and numbers as in be
 
 const CYR = /[А-ЯЁЇІЄҐа-яїієґ]/;
 const dict = new Map(), pats = [];
