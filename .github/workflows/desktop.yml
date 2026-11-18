@@ -9,7 +9,7 @@ on:
   push:
     tags: ["v*"]
     branches: ["main"] # лише main: інакше кожна зміна збиралася двічі (гілка + злиття) і гілка перезаписувала тестові релізи
-    paths: ["desktop/**", "flatpak/**", "scripts/dist.mjs", ".github/workflows/desktop.yml", "index.html", "css/**", "js/**", "icons/**"]
+    paths: ["desktop/**", "flatpak/**", "scripts/dist.mjs", ".github/workflows/desktop.yml", "index.html", "css/**", "js/**", "icons/**", "fonts/**"]
   workflow_dispatch:
     inputs:
       version:

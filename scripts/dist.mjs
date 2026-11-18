@@ -8,7 +8,7 @@ const target = process.argv[2] || "desktop/web";
 const dist = root + target + "/";
 rmSync(dist, { recursive: true, force: true });
 mkdirSync(dist);
-for (const f of ["index.html", "favicon.ico", "css", "js", "icons", "manifest.webmanifest"]) cpSync(root + f, dist + f, { recursive: true });
+for (const f of ["index.html", "favicon.ico", "css", "js", "icons", "fonts", "manifest.webmanifest"]) cpSync(root + f, dist + f, { recursive: true });
 // Capacitor (Android) puts its native bridge into the page as an inline script, which the Content-Security-Policy in
 // index.html would block. So for the phones the policy is only carried along (meta name="skybee-csp") and native.js turns
 // it on right after start — the bridge has already run by then, and everything after it is under the policy.
