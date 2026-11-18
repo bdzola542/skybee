@@ -59,7 +59,7 @@ nav.side .logo { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
 aside.right { position: sticky; top: 0; height: 100vh; padding: 12px 16px; }
 nav.bottom, .fab, .only-mobile { display: none; }
 
-@media (max-width: 1100px) { #app { grid-template-columns: 80px minmax(0, 600px); } aside.right { display: none; } nav.side .nl, nav.side .logo span, .compose-side span { display: none; } nav.side a, .me { justify-content: center; } }
+@media (max-width: 1140px) { #app { grid-template-columns: 80px minmax(0, 600px); } aside.right { display: none; } nav.side .nl, nav.side .logo span, .compose-side span { display: none; } nav.side a, .me { justify-content: center; } }
 @media (max-width: 640px) {
   #app { display: block; }
   /* the side menu becomes a drawer opened with the ☰ button */
@@ -480,7 +480,7 @@ main.sb-tint .phead .bigava { border-color: var(--accent); }
 .sb-toy:hover { transform: rotate(-4deg) scale(1.08); }
 
 /* wide screens show «my profile» as a card in the right column, so the side menu does not repeat it */
-@media (min-width: 1101px) { nav.side a[data-nav^="#/profile"] { display: none; } }
+@media (min-width: 1141px) { nav.side a[data-nav^="#/profile"] { display: none; } }
 
 /* thin scrollbars everywhere (the desktop app shows Chromium's thick ones with arrows otherwise) */
 * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 45%, transparent) transparent; }
@@ -497,7 +497,7 @@ body.deckmode main { border-right: 0; padding-bottom: 0; height: 100vh; display:
 .dbody { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .dbody .post { padding: 10px 12px; }
 .dcol > .muted, .deck > .muted { margin: auto; }
-@media (max-width: 1100px) { body.deckmode #app { grid-template-columns: 80px minmax(0, 1fr); } }
+@media (max-width: 1140px) { body.deckmode #app { grid-template-columns: 80px minmax(0, 1fr); } }
 /* phones: one column per screen, swiped sideways */
 @media (max-width: 640px) {
   body.deckmode main { height: calc(100dvh - 58px - var(--sab)); }
@@ -546,7 +546,7 @@ body.guest .topbar { top: 49px; }
 .sfeed:hover { background: var(--hover); }
 .sfeed.on { background: var(--hover); font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
 .sfeed .clip { min-width: 0; }
-@media (min-width: 1101px) { #feedTabs { display: none; } }
+@media (min-width: 1141px) { #feedTabs { display: none; } }
 .dhead [data-d=refresh].fresh { color: var(--accent); position: relative; }
 .dhead [data-d=refresh].fresh::after { content: ""; position: absolute; top: 3px; right: 4px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 /* older Chromium (the desktop app) ignores scrollbar-width: thin bars there too, without arrows */
@@ -1962,17 +1962,36 @@ article.post[hidden], article.post.bm-out { display: none !important; }
 @font-face { font-family: "Zakon"; src: url("../fonts/Zakon-Bold.ttf") format("truetype"); font-style: normal; font-weight: 700; font-display: swap; }
 @font-face { font-family: "Zakon"; src: url("../fonts/Zakon-BoldItalic.ttf") format("truetype"); font-style: italic; font-weight: 700; font-display: swap; }
 /* Keep the selected national typeface active across Skybee, including platform UI modes. */
+/* Zakon is always its own family; a previously selected custom font must never leak into it. */
 :root[data-font-family="zakon"] body,
 :root[data-font-family="zakon"] button,
 :root[data-font-family="zakon"] input,
 :root[data-font-family="zakon"] textarea,
-:root[data-font-family="zakon"] select,
+:root[data-font-family="zakon"] select { font-family: "Zakon", system-ui, sans-serif !important; }
+/* Custom typefaces are local to this device and supplied through the CSS variable by settings.js. */
 :root[data-font-family="custom"] body,
 :root[data-font-family="custom"] button,
 :root[data-font-family="custom"] input,
 :root[data-font-family="custom"] textarea,
-:root[data-font-family="custom"] select { font-family: var(--skybee-font-family, "Zakon"), system-ui, sans-serif !important; }
-:root[data-font-style="regular"] body { font-style: normal; font-weight: 400; }
-:root[data-font-style="italic"] body { font-style: italic; font-weight: 400; }
-:root[data-font-style="bold"] body { font-style: normal; font-weight: 700; }
-:root[data-font-style="bolditalic"] body { font-style: italic; font-weight: 700; }
+:root[data-font-family="custom"] select { font-family: var(--skybee-font-family, system-ui), system-ui, sans-serif !important; }
+/* Apply the chosen face consistently to the page and native controls. */
+:root[data-font-style="regular"] body,
+:root[data-font-style="regular"] button,
+:root[data-font-style="regular"] input,
+:root[data-font-style="regular"] textarea,
+:root[data-font-style="regular"] select { font-style: normal; }
+:root[data-font-style="italic"] body,
+:root[data-font-style="italic"] button,
+:root[data-font-style="italic"] input,
+:root[data-font-style="italic"] textarea,
+:root[data-font-style="italic"] select { font-style: italic; }
+:root[data-font-style="bold"] body,
+:root[data-font-style="bold"] button,
+:root[data-font-style="bold"] input,
+:root[data-font-style="bold"] textarea,
+:root[data-font-style="bold"] select { font-weight: 700; }
+:root[data-font-style="bolditalic"] body,
+:root[data-font-style="bolditalic"] button,
+:root[data-font-style="bolditalic"] input,
+:root[data-font-style="bolditalic"] textarea,
+:root[data-font-style="bolditalic"] select { font-style: italic; font-weight: 700; }
