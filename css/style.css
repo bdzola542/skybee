@@ -1954,3 +1954,25 @@ article.post[hidden], article.post.bm-out { display: none !important; }
 .ltime { color: var(--muted); font-size: .92em; }
 .sb-badge { display: inline-flex; vertical-align: -2px; margin-left: 4px; }
 .sb-badge svg { display: block; }
+
+
+/* ---------- Zakon national typeface ---------- */
+@font-face { font-family: "Zakon"; src: url("../fonts/Zakon-Regular.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "Zakon"; src: url("../fonts/Zakon-Italic.ttf") format("truetype"); font-style: italic; font-weight: 400; font-display: swap; }
+@font-face { font-family: "Zakon"; src: url("../fonts/Zakon-Bold.ttf") format("truetype"); font-style: normal; font-weight: 700; font-display: swap; }
+@font-face { font-family: "Zakon"; src: url("../fonts/Zakon-BoldItalic.ttf") format("truetype"); font-style: italic; font-weight: 700; font-display: swap; }
+/* Keep the selected national typeface active across Skybee, including platform UI modes. */
+:root[data-font-family="zakon"] body,
+:root[data-font-family="zakon"] button,
+:root[data-font-family="zakon"] input,
+:root[data-font-family="zakon"] textarea,
+:root[data-font-family="zakon"] select,
+:root[data-font-family="custom"] body,
+:root[data-font-family="custom"] button,
+:root[data-font-family="custom"] input,
+:root[data-font-family="custom"] textarea,
+:root[data-font-family="custom"] select { font-family: var(--skybee-font-family, "Zakon"), system-ui, sans-serif !important; }
+:root[data-font-style="regular"] body { font-style: normal; font-weight: 400; }
+:root[data-font-style="italic"] body { font-style: italic; font-weight: 400; }
+:root[data-font-style="bold"] body { font-style: normal; font-weight: 700; }
+:root[data-font-style="bolditalic"] body { font-style: italic; font-weight: 700; }

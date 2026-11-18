@@ -35,6 +35,46 @@ const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
   set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
 };
+
+// User-installed typefaces are kept in IndexedDB so larger font files survive restarts.
+const FONT_DB = "skybee-font-library", FONT_STORE = "fonts";
+let activeUserFont = "";
+function openFontDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(FONT_DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(FONT_STORE, { keyPath: "id" });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function withFontStore(mode, action) {
+  const db = await openFontDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FONT_STORE, mode), req = action(tx.objectStore(FONT_STORE));
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+    tx.oncomplete = () => db.close();
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+const listUserFonts = () => withFontStore("readonly", s => s.getAll());
+const saveUserFont = record => withFontStore("readwrite", s => s.put(record));
+const getUserFont = id => withFontStore("readonly", s => s.get(id));
+const removeUserFont = id => withFontStore("readwrite", s => s.delete(id));
+async function activateUserFont(id) {
+  if (!id || activeUserFont === id) return;
+  const rec = await getUserFont(id);
+  if (!rec) return;
+  const family = "SkybeeUserFont_" + id.replace(/[^a-z0-9]/gi, "");
+  if (!document.fonts.check('16px "' + family + '"')) {
+    const url = URL.createObjectURL(rec.blob);
+    try { document.fonts.add(await new FontFace(family, 'url("' + url + '")').load()); }
+    finally { URL.revokeObjectURL(url); }
+  }
+  document.documentElement.style.setProperty("--skybee-font-family", '"' + family + '"');
+  activeUserFont = id;
+}
+
 // The app colour belongs to the account (switching accounts switches the colour). An older device-wide value
 // goes to the account that is open the first time this runs.
 const ownDid = () => { try { return JSON.parse(localStorage.getItem("skybee.session"))?.did || ""; } catch { return ""; } };
@@ -494,6 +534,10 @@ export function applyLook() {
   // interface style: Liquid Glass (iPhone by default) or Material Design (Android by default), each with its own options
   const ui = uiStyle();
   root.dataset.ui = ui;
+  const selectedFont = store.get("skybee.fontFamily") || "zakon";
+  root.dataset.fontFamily = selectedFont.startsWith("custom:") ? "custom" : "zakon";
+  root.dataset.fontStyle = ["regular", "italic", "bold", "bolditalic"].includes(store.get("skybee.fontStyle")) ? store.get("skybee.fontStyle") : "regular";
+  if (selectedFont.startsWith("custom:")) activateUserFont(selectedFont.slice(7)).catch(() => toast("Не вдалося завантажити власний шрифт"));
   root.dataset.glass = store.get("skybee.glass") || "normal";
   root.classList.toggle("glass-float", store.get("skybee.glassFloat") !== "0");
   // refraction needs backdrop-filter: url(…), which only Chromium draws (desktop app, Android, Chrome); Safari would drop the blur too
@@ -513,6 +557,8 @@ export function applyLook() {
   statusBarFor(root.dataset.theme !== "light");
 }
 export async function appearance(el) {
+  let userFonts = [];
+  try { userFonts = await listUserFonts(); } catch {}
   const draw = () => {
     const theme = store.get("skybee.theme") || "dark", font = store.get("skybee.font") || "15", color = isHex(appColor()) ? appColor() : "";
     const icolor = iconColor(), ibg = iconBg(), uiPick = store.get("skybee.ui") || "auto", ui = uiStyle();
@@ -525,6 +571,12 @@ export async function appearance(el) {
         ${seg("ibg", [["", "Світла"], ["dim", "Сутінки"], ["dark", "Темна"]], ibg)}<div class="sb-icons">${[["", "Золота — як є"], ...APP_COLORS.filter(([c]) => !isNative || ICON_COLORS.includes(c))].map(([c, n]) => `<button type="button" class="sb-ic${c === icolor ? " on" : ""}" data-icon="${c}" title="${n}" aria-label="${n}"><img alt="" src="${svgUrl(beeSvg(c, true, 112, ibg))}"></button>`).join("")}${isNative ? "" : `<label class="sb-ic sb-any${icolor && !APP_COLORS.some(([c]) => c === icolor) ? " on" : ""}" title="Свій колір"><input type="color" data-anyicon value="${icolor || "#ff4d4d"}">${icolor && !APP_COLORS.some(([c]) => c === icolor) ? `<img alt="" src="${svgUrl(beeSvg(icolor, true, 112, ibg))}">` : "<b>+</b>"}</label>`}</div></div>
       <div class="card"><h3>Вигляд стрічки</h3><p class="muted small">«Компактний» — багато постів на екрані, дрібні відступи й картинки. «Мозаїка» — режим сітки ▦ показує фото різної висоти, як Pinterest.</p>
         ${seg("fl", [["", "Звичайний"], ["compact", "Компактний"], ["mosaic", "Мозаїка"]], store.get("skybee.feedLook") || "")}</div>
+      <div class="card"><h3>Шрифт</h3><p class="muted small">Використовуй національний шрифт Zakon або встанови власний файл. Підтримуються TTF, OTF, WOFF і WOFF2.</p>
+        <div class="seg"><button type="button" data-fontfamily="zakon" class="${(store.get("skybee.fontFamily") || "zakon") === "zakon" ? "on" : ""}">Zakon</button><button type="button" data-fontfamily="custom" class="${(store.get("skybee.fontFamily") || "").startsWith("custom:") ? "on" : ""}">Мій шрифт</button></div>
+        ${userFonts.length ? `<label class="field">Встановлений шрифт<select id="userFontChoice">${userFonts.map(f => `<option value="${esc(f.id)}" ${store.get("skybee.fontFamily") === "custom:" + f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></label><button type="button" class="ghost sm danger" id="removeUserFont">Видалити вибраний шрифт</button>` : ""}
+        <label class="field">Завантажити власні шрифти<input id="userFontUpload" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" multiple></label>
+        <p class="muted small">Файли зберігаються лише на цьому пристрої. Можна додати кілька шрифтів і перемикатися між ними.</p>
+        <p class="muted small">Накреслення:</p>${seg("fontstyle", [["regular", "Regular"], ["italic", "Regular Italic"], ["bold", "Bold"], ["bolditalic", "Bold Italic"]], store.get("skybee.fontStyle") || "regular")}</div>
       <div class="card"><h3>Розмір тексту</h3>${seg("font", [["14", "Менший"], ["15", "Звичайний"], ["17", "Більший"], ["19", "Великий"]], font)}</div>
       ${window.skybeeDesktop || window.Capacitor?.isNativePlatform?.() ? `<div class="card"><h3>Анімація запуску</h3>
         <p class="muted small">Бджола пролітає над лукою й сідає в логотип. Небо — за темою (уночі місяць і зорі) і кольором застосунку.</p>
@@ -555,6 +607,38 @@ export async function appearance(el) {
     const anyI = el.querySelector("[data-anyicon]");
     if (anyI) anyI.onchange = () => { setIconColor(anyI.value); draw(); };
     el.querySelectorAll("[data-font]").forEach(b => b.onclick = () => { store.set("skybee.font", b.dataset.font); applyLook(); draw(); });
+    el.querySelectorAll("[data-fontstyle]").forEach(b => b.onclick = () => { store.set("skybee.fontStyle", b.dataset.fontstyle); applyLook(); draw(); });
+    el.querySelectorAll("[data-fontfamily]").forEach(b => b.onclick = () => {
+      if (b.dataset.fontfamily === "zakon") store.set("skybee.fontFamily", "zakon");
+      else if (userFonts.length) store.set("skybee.fontFamily", "custom:" + userFonts[0].id);
+      applyLook(); draw();
+    });
+    el.querySelector("#userFontChoice")?.addEventListener("change", e => {
+      store.set("skybee.fontFamily", "custom:" + e.target.value); applyLook(); draw();
+    });
+    el.querySelector("#userFontUpload")?.addEventListener("change", async e => {
+      for (const file of [...(e.target.files || [])]) {
+        const ext = file.name.split(".").pop().toLowerCase();
+        if (!["ttf", "otf", "woff", "woff2"].includes(ext)) { toast("Непідтримуваний формат: " + file.name); continue; }
+        if (file.size > 10 * 1024 * 1024) { toast("Файл завеликий (максимум 10 МБ): " + file.name); continue; }
+        const id = crypto.randomUUID?.() || (Date.now() + "-" + Math.random().toString(36).slice(2));
+        const name = file.name.replace(/\.[^.]+$/, "");
+        try { await saveUserFont({ id, name, blob: file, format: ext }); }
+        catch { toast("Не вдалося зберегти " + file.name); continue; }
+        userFonts.push({ id, name, format: ext });
+        store.set("skybee.fontFamily", "custom:" + id);
+      }
+      applyLook(); await appearance(el);
+    });
+    el.querySelector("#removeUserFont")?.addEventListener("click", async () => {
+      const id = el.querySelector("#userFontChoice")?.value;
+      if (!id) return;
+      await removeUserFont(id);
+      userFonts = userFonts.filter(f => f.id !== id);
+      if (store.get("skybee.fontFamily") === "custom:" + id) store.set("skybee.fontFamily", "zakon");
+      activeUserFont = ""; document.documentElement.style.removeProperty("--skybee-font-family");
+      applyLook(); await appearance(el);
+    });
     el.querySelectorAll("[data-fl]").forEach(b => b.onclick = () => { store.set("skybee.feedLook", b.dataset.fl || null); applyLook(); draw(); });
     el.querySelectorAll("[data-intro]").forEach(b => b.onclick = () => { store.set("skybee.intro", b.dataset.intro === "full" ? null : b.dataset.intro); draw(); });
     el.querySelectorAll("[data-ui]").forEach(b => b.onclick = () => { store.set("skybee.ui", b.dataset.ui === "auto" ? null : b.dataset.ui); applyLook(); draw(); });
