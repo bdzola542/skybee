@@ -163,7 +163,7 @@ const te = new TextEncoder(), td = new TextDecoder();
 const TLDS = new Set("com net org info io app dev one me tv xyz social blog site online store shop tech page link art club news live space world fm gg co ai cc biz pro name email cloud zone wiki help guide media studio design team life music video photo games fun top today network systems agency academy community digital foundation global group center institute school university education gov edu mil int".split(" "));
 const NOT_TLD = new Set(["js", "ts", "py", "rb", "sh", "md", "cs", "go", "rs", "kt", "mp", "gz", "db"]);
 const isTld = (t) => (t = t.toLowerCase(), TLDS.has(t) || (t.length === 2 && !NOT_TLD.has(t)));
-const LINK_RX = /(https?:\/\/[^\s<]+[^\s<.,;:!?)"'])|(^|[\s(])@([a-zA-Z0-9.-]+\.[a-zA-Z]+)|(^|[\s(])#([^\s#<]+)|(^|[\s(])((?:[a-zA-Z0-9-]+\.)+([a-zA-Z]{2,24})(?:\/[^\s<]*[^\s<.,;:!?)"'])?)(?![\w@])/g;
+const LINK_RX = /(https?:\/\/[^\s<]+[^\s<.,;:!?)"'])|(^|[\s(])@([a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?)|(^|[\s(])#([^\s#<]+)|(^|[\s(])((?:[a-zA-Z0-9-]+\.)+([a-zA-Z]{2,24})(?:\/[^\s<]*[^\s<.,;:!?)"'])?)(?![\w@])/g;
 const short = (u) => { const t = u.replace(/^https?:\/\//, ""); return t.length > 40 ? t.slice(0, 40) + "…" : t; };
 export function linkify(s) {
   return esc(s).replace(LINK_RX, (m, url, sp1, handle, sp2, tag, sp3, dom, tld) => {
@@ -195,7 +195,7 @@ function richTextRaw(text = "", facets) {
   for (const f of [...facets].sort((a, b) => a.index.byteStart - b.index.byteStart)) {
     const { byteStart: s, byteEnd: e } = f.index;
     if (s < pos || e > bytes.length) continue;
-    out += esc(td.decode(bytes.slice(pos, s)));
+    out += linkify(td.decode(bytes.slice(pos, s))); // what the facets did not cover (an @name that never resolved) is still linked
     const seg = esc(td.decode(bytes.slice(s, e)));
     const ft = f.features?.[0] || {};
     if (ft.$type === "app.bsky.richtext.facet#link") out += safeUrl(ft.uri) ? `<a href="${esc(safeUrl(ft.uri))}" target="_blank" rel="noopener">${seg}</a>` : seg;
@@ -204,7 +204,7 @@ function richTextRaw(text = "", facets) {
     else out += seg;
     pos = e;
   }
-  return out + esc(td.decode(bytes.slice(pos)));
+  return out + linkify(td.decode(bytes.slice(pos)));
 }
 
 /* ---------- moderation labels ---------- */
