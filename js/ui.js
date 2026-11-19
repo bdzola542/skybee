@@ -446,14 +446,17 @@ export function renderPost(p, { reason, parent, thread = false, focus = false, l
   if (parent?.author && !thread) top.push(`<div class="reason">↩︎ У відповідь <a href="${profileHref(parent.author)}">${name(parent.author)}</a></div>`);
   if (hiddenReplies.has(p.uri)) top.push(`<div class="reason">🙈 Автор гілки приховав цю відповідь</div>`);
   const langs = rec.langs?.length && !rec.langs.includes("uk") ? `<button class="linklike small" data-act="translate">Перекласти</button>` : "";
+  // Skybee's own self-label «spoiler»: text and media are behind one «Показати»
+  const spoil = rec.labels?.values?.some(v => v.val === "spoiler") ? { text: "Спойлер" } : null;
+  const hideSp = (html) => spoil ? blurWrap(html, spoil) : html;
   if (focus) return `
   <article class="post focus" data-uri="${esc(p.uri)}">
     <div class="row">${avatar(a, 48)}
       <div class="who"><a href="${profileHref(a)}"><b>${vname(a)}</b></a><span class="muted">${at(a.handle)}</span></div>
       ${followBtn(a)}
     </div>
-    <div class="text big">${richText(rec.text, rec.facets)}</div>
-    ${renderEmbed(p.embed, label)}
+    ${hideSp(`<div class="text big">${richText(rec.text, rec.facets)}</div>
+    ${renderEmbed(p.embed, label)}`)}
     ${langs}
     <div class="muted small" style="margin:10px 0">${fullDate(rec.createdAt || p.indexedAt)}</div>
     <div class="stats">
@@ -470,8 +473,8 @@ export function renderPost(p, { reason, parent, thread = false, focus = false, l
     <div class="body">
       ${top.join("")}
       <div class="meta"><a href="${profileHref(a)}"><b>${vname(a)}</b></a> <span>${at(a.handle)}</span> · <a href="${postHref(p)}" title="${esc(fullDate(p.indexedAt))}">${ago(p.indexedAt)}</a></div>
-      <div class="text">${richText(rec.text, rec.facets)}</div>
-      ${renderEmbed(p.embed, label)}
+      ${hideSp(`<div class="text">${richText(rec.text, rec.facets)}</div>
+      ${renderEmbed(p.embed, label)}`)}
       ${langs}
       ${actionsBar(p)}
     </div>

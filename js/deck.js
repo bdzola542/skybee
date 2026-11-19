@@ -221,7 +221,7 @@ export function describe(f) {
 }
 
 export async function myFeeds(el) {
-  el.innerHTML = header("Мої стрічки", true, `<a class="btn sm" href="#/myfeeds/new">＋ Нова</a>`) + `
+  el.innerHTML = header("Мої стрічки", true, `<button class="ghost sm" id="quickfeed" title="Швидка стрічка з кількох людей" aria-label="Швидка стрічка" style="white-space:nowrap">⚡</button><a class="btn sm" href="#/myfeeds/new">＋ Нова</a>`) + `
     <p class="pad hint">Збирай власні стрічки з підписок, фідів, списків, пошуку й профілів, з ключовими словами, фільтрами й сортуванням.
     Вони працюють прямо в Skybee і зберігаються у твоєму акаунті, тож є на всіх пристроях. Можна закріпити на головній або додати колонкою.</p><div id="mf"></div>`;
   const box = $("#mf", el);
@@ -236,6 +236,32 @@ export async function myFeeds(el) {
   };
   draw(await src.myFeeds());
   src.myFeeds(true).then(draw).catch(() => {});
+  // the simple way: a name, some people, «with reposts or not» — and the feed is ready
+  $("#quickfeed", el).onclick = () => {
+    const m = modal(`<h3>Швидка стрічка</h3><p class="muted small">Пости вибраних людей в одній стрічці. Складніші налаштування — через «＋ Нова».</p><p class="err"></p>
+      <input class="input" data-n placeholder="Назва стрічки" maxlength="60" style="margin:8px 0">
+      <textarea class="input" data-h rows="4" style="margin-bottom:8px" placeholder="Імена людей через пробіл чи кому: alice.bsky.social, @bob, carol.com" maxlength="2000"></textarea>
+      <label class="check"><input type="checkbox" data-r checked> Показувати їхні поширення</label>
+      <div class="row between"><button class="ghost" data-q="0">Скасувати</button><button class="btn" data-q="go">Створити</button></div>`);
+    const err = m.querySelector(".err");
+    m.addEventListener("click", async (ev) => {
+      const q = ev.target.closest("[data-q]")?.dataset.q; if (!q) return;
+      if (q === "0") return m.close();
+      err.textContent = "";
+      const name = m.querySelector("[data-n]").value.trim();
+      const handles = [...new Set(m.querySelector("[data-h]").value.split(/[\s,;]+/).map(h => h.replace(/^@/, "").trim().toLowerCase()).filter(Boolean).map(h => /^did:|\./.test(h) ? h : h + ".bsky.social"))].slice(0, 25);
+      if (!name || !handles.length) { err.textContent = "Потрібні назва й хоча б одна людина"; return; }
+      ev.target.disabled = true;
+      try {
+        const { profiles } = await api.get("app.bsky.actor.getProfiles", { actors: handles });
+        if (!profiles.length) { err.textContent = "Нікого не знайдено в Bluesky"; ev.target.disabled = false; return; }
+        const f = { ...src.blankFeed(), name, sources: profiles.map(p => ({ type: "author", value: p.did, label: p.displayName || p.handle })), hideReposts: !m.querySelector("[data-r]").checked };
+        await src.saveMyFeeds([...(await src.myFeeds()), f]);
+        const miss = handles.length - profiles.length;
+        m.close(); toast(miss > 0 ? `Створено; не знайдено: ${miss}` : "Стрічку створено"); location.hash = src.myFeedHref(f);
+      } catch (ex) { err.textContent = errText(ex); ev.target.disabled = false; }
+    });
+  };
   box.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-f]"); if (!b) return;
     e.preventDefault(); e.stopPropagation();
