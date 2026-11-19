@@ -53,10 +53,21 @@ export function onGrid(el, redraw) {
 }
 
 // hideMuted: in feeds, posts with muted words disappear; elsewhere renderPost collapses them
-export const feedItems = (feed, hideMuted = false, from) => feed.map(it => {
-  if (!it.post || (hideMuted && (mutedBy(it.post) || warnLabel(it.post)?.hide))) return "";
-  return renderPost(it.post, { reason: it.reason, parent: it.reply?.parent, feed: from, ctx: it.feedContext });
-});
+// A post reposted by several people (or already shown) is not repeated further down the feed: uri → who brought it first
+// (only within one loaded page: a map kept longer wrongly dropped posts after a tab switch or a refresh)
+export const feedItems = (feed, hideMuted = false, from) => {
+  const snoozed = hideMuted ? X.snoozeFilter() : null, shownPosts = new Map();
+  return feed.map(it => {
+    if (!it.post || (hideMuted && (mutedBy(it.post) || warnLabel(it.post)?.hide || snoozed(it)))) return "";
+    if (hideMuted) {
+      const key = it.reason?.by?.did || "own";
+      const first = shownPosts.get(it.post.uri);
+      if (first === undefined) shownPosts.set(it.post.uri, key);
+      else if (first !== key && it.reason?.$type === "app.bsky.feed.defs#reasonRepost") return ""; // the same item drawn again keeps its key and stays
+    }
+    return renderPost(it.post, { reason: it.reason, parent: it.reply?.parent, feed: from, ctx: it.feedContext });
+  });
+};
 
 // «📅 У Bluesky з …»: the profile often has no createdAt, then the date comes from the first entry of the account's public DID log
 const joinedLine = (iso) => `📅 У Bluesky з ${new Date(iso).toLocaleDateString(LOC, { day: "numeric", month: "long", year: "numeric" })}`;
@@ -306,8 +317,10 @@ export async function thread(el, { actor, rkey, read = false }) {
   hiddenReplies.clear();
   for (const u of root.post.threadgate?.record?.hiddenReplies || []) hiddenReplies.add(u);
   const hidden = []; // replies hidden by the thread's author go under a fold at the bottom
+  const suspect = [], botOn = X.botFilterOn(); // «suspicious replies» (setting): their own fold
   const replies = (node, depth = 0) => (node.replies || [])
-    .filter(r => r.$type === "app.bsky.feed.defs#threadViewPost" && !(hiddenReplies.has(r.post.uri) && hidden.push(r.post)))
+    .filter(r => r.$type === "app.bsky.feed.defs#threadViewPost" && !(hiddenReplies.has(r.post.uri) && hidden.push(r.post))
+      && !(botOn && X.looksBot(r.post.author, session?.did) && suspect.push(r.post)))
     .sort((a, b) => (b.post.author.did === t.post.author.did) - (a.post.author.did === t.post.author.did) || order(a.post, b.post))
     .map(r => `<div class="reply d${Math.min(depth, 4)}">${renderPost(r.post, { thread: true, line: !!r.replies?.length && depth < 5 })}${depth < 5 ? replies(r, depth + 1) : ""}</div>`).join("");
   const noReply = !!t.post.viewer?.replyDisabled;
@@ -319,6 +332,7 @@ export async function thread(el, { actor, rkey, read = false }) {
     (noReply ? "" : !session ? `<a class="replybox" href="#/login"><span class="muted">Увійди, щоб відповісти…</span></a>`
       : `<div class="replybox" data-act="reply" role="button" tabindex="0" data-uri="${esc(t.post.uri)}">${avatar(actors.get(session.did) || {}, 32)}<span class="muted">Напиши відповідь…</span></div>`) +
     (replies(t) || empty("Відповідей ще немає")) +
+    (suspect.length ? `<details class="hidden-replies"><summary class="muted pad">🤖 Підозрілі відповіді: ${suspect.length}</summary>${suspect.map(p => renderPost(p, { thread: true })).join("")}</details>` : "") +
     (hidden.length ? `<details class="hidden-replies"><summary class="muted pad">Приховані відповіді: ${hidden.length}</summary>${hidden.map(p => renderPost(p, { thread: true })).join("")}</details>` : "");
   el.querySelector(".post.focus")?.scrollIntoView({ block: "start" });
   scrollBy(0, -60 - (document.querySelector(".guestbar")?.offsetHeight || 0));
@@ -881,6 +895,7 @@ export async function bookmarks(el) {
   el.innerHTML = header("Закладки");
   X.attachFilter(el, "Пошук у закладках");
   // folders (kept on this device): chips under the search, a post goes into a folder from its «⋯» menu
+  await X.pullFolders(); // with «Папки закладок в акаунті» on: the newer side (this device or the account) wins
   const names = Object.keys(X.folders());
   let folder = "";
   if (names.length) {

@@ -60,10 +60,36 @@ export async function show(title, body, hash, tag) {
   } catch { /* not allowed here */ }
 }
 
+/* ---------- followed threads: a notice when new replies appear anywhere in the thread (checked every 5 minutes) ---------- */
+export const countReplies = (n) => (n?.replies || []).reduce((s, r) => s + (r.$type === "app.bsky.feed.defs#threadViewPost" ? 1 + countReplies(r) : 0), 0);
+export const threadSubsKey = () => `skybee.threadSubs.${api.session?.did || "x"}`;
+export const threadSubs = () => { try { return JSON.parse(getItem(threadSubsKey())) || {}; } catch { return {}; } };
+export const saveThreadSubs = (s) => setItem(threadSubsKey(), Object.keys(s).length ? JSON.stringify(s) : null);
+let tsAt = 0;
+async function checkThreads() {
+  if (Date.now() - tsAt < 5 * 60e3) return; tsAt = Date.now();
+  const subs = threadSubs();
+  for (const [uri, s] of Object.entries(subs).slice(0, 10)) {
+    try {
+      const { thread } = await api.get("app.bsky.feed.getPostThread", { uri, depth: 10, parentHeight: 0 });
+      const n = countReplies(thread);
+      if (n > (s.n || 0)) {
+        const [, , did, , rkey] = uri.split("/");
+        if (!(document.visibilityState === "visible" && document.hasFocus())) show("Skybee", t("Нових відповідей у гілці, за якою ви стежите: {0}", n - (s.n || 0)), `#/profile/${did}/post/${rkey}`, "thread-" + rkey);
+      }
+      s.n = n; // also lowers when replies are deleted
+    } catch { /* the post is gone or the network is down: try again later */ }
+  }
+  const now = threadSubs(); // the user may have (un)followed a thread while the requests ran: only the counters are updated
+  for (const k of Object.keys(now)) if (subs[k]) now[k].n = subs[k].n;
+  saveThreadSubs(now);
+}
+
 let lastCount = -1, lastDid = "";
 // Called after every badge poll: `count` of unread notifications and the chat list (null when chats are unavailable)
 export async function check(count, convos) {
   if (!enabled() || !api.session) return;
+  checkThreads().catch(() => {});
   if (api.session.did !== lastDid) { lastDid = api.session.did; lastCount = -1; } // another account: its count starts afresh
   const me = api.session.did, now = new Date().toISOString(), who = (a) => a?.displayName || a?.handle || "Хтось";
   let mark = {};

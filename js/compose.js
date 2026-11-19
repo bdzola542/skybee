@@ -84,7 +84,7 @@ const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/mpeg"]
 const MAX_VIDEO = 300e6; // the largest video Bluesky accepts
 const MAX_THREAD = 25;
 const isMotion = (f) => VIDEO_TYPES.includes(f.type) || f.type === "image/gif"; // GIFs stay animated only as videos
-const WARNINGS = [["", "Без позначки"], ["sexual", "Відвертий вміст"], ["nudity", "Оголеність"], ["porn", "Для дорослих"], ["graphic-media", "Жорсткий вміст"]];
+const WARNINGS = [["", "Без позначки"], ["sexual", "Відвертий вміст"], ["nudity", "Оголеність"], ["porn", "Для дорослих"], ["graphic-media", "Жорсткий вміст"], ["spoiler", "Спойлер (текст і медіа)"]];
 
 // Pixel size of a video or GIF file, or null when the browser cannot read it
 const mediaSize = (file, gif) => new Promise(res => {
@@ -355,9 +355,17 @@ export function openComposer(opts = {}, onDone) {
       dm.addEventListener("click", (ev) => {
         const b = ev.target.closest("[data-d]"); if (!b) return; const id = b.dataset.id;
         if (b.dataset.d === "close") dm.close();
-        if (b.dataset.d === "save") { if (X.saveDraft(ta.value)) { toast("Чернетку збережено 📝"); draw(); } }
+        if (b.dataset.d === "save") {
+          const texts = all().map(x => x.text);
+          if (X.saveDraft(ta.value, texts.length > 1 ? texts : undefined)) { toast(texts.length > 1 ? `Чернетку гілки (${texts.length}) збережено 📝 — лише текст` : "Чернетку збережено 📝"); draw(); }
+        }
         if (b.dataset.d === "del") { X.dropDraft(id); draw(); }
-        if (b.dataset.d === "use") { const d = X.drafts().find(x => x.id === id); if (d && (!ta.value.trim() || confirm("Замінити поточний текст чернеткою?"))) { ta.value = d.text; update(); ta.dispatchEvent(new Event("input", { bubbles: true })); dm.close(); } }
+        if (b.dataset.d === "use") { const d = X.drafts().find(x => x.id === id); if (d && (!dirty() || confirm("Замінити поточний текст чернеткою?"))) {
+          if (d.parts?.length > 1) { // a whole thread: the first post is opened, the rest wait under it
+            thread.length = 0; thread.push(null, ...d.parts.slice(1).map(text => ({ text, images: [], video: null, card: null, cardFor: null }))); cur = 0;
+            images.length = 0; video = null; card = null; cardFor = null; mentions.innerHTML = ""; ta.value = d.parts[0]; renderParts(); renderPreviews(); renderCard();
+          } else ta.value = d.text;
+          update(); ta.dispatchEvent(new Event("input", { bubbles: true })); dm.close(); } }
       });
     }
     if (c === "later" && !busy) {
@@ -499,7 +507,8 @@ async function publish({ text, images, video, card, replyTo, quote, lang, warn, 
     media = { $type: "app.bsky.embed.external", external };
   }
   // the author's own warning covers the media of the post
-  if (warn && (video || images.length)) record.labels = { $type: "com.atproto.label.defs#selfLabels", values: [{ val: warn }] };
+  // «spoiler» is Skybee's own label: it hides the text too (other clients ignore an unknown label)
+  if (warn && (warn === "spoiler" || video || images.length)) record.labels = { $type: "com.atproto.label.defs#selfLabels", values: [{ val: warn }] };
 
   if (quote) {
     const rec = { $type: "app.bsky.embed.record", record: api.strongRef(quote) };

@@ -465,7 +465,8 @@ async function route() {
   document.body.classList.remove("deckmode");
   main._tint = null; // the page colour stays only if the new screen claims it (profile, post)
   let keepScroll = null; try { keepScroll = JSON.parse(sessionStorage.getItem("skybee.scroll:" + location.hash)); } catch {}
-  scrollTo(0, 0);
+  // coming back: the page is held at the old place at once (min-height keeps it reachable while the list loads), not shown from the top
+  if (keepScroll?.y) { main.style.minHeight = (keepScroll.y + innerHeight) + "px"; scrollTo(0, keepScroll.y); } else scrollTo(0, 0);
   try {
     let r;
     if (path === "/") r = V.home(main);
@@ -500,9 +501,10 @@ async function route() {
     if (my !== routeSeq) { if (typeof done === "function") done(); return; }
     cleanup = done;
     if (!main._tint) flair.untint(main);
-    if (keepScroll) restoreScroll(keepScroll);
+    if (keepScroll) restoreScroll(keepScroll); else main.style.minHeight = "";
   } catch (e) {
     if (my !== routeSeq) return; // a newer screen is already there
+    main.style.minHeight = "";
     if (!main._tint) flair.untint(main);
     main.querySelectorAll(".sentinel").forEach(x => x.remove()); // no spinner left turning above the error
     main.insertAdjacentHTML("beforeend", `<div class="card"><p class="err">${esc(errText(e))}</p><button class="ghost" data-act="back">← Назад</button></div>`);
@@ -831,9 +833,9 @@ addEventListener("scroll", () => {
 }, { passive: true });
 function restoreScroll(k) {
   if (typeof k === "number") k = { y: k };
-  if (!k?.y) return;
+  if (!k?.y) { const m = $("#main"); if (m) m.style.minHeight = ""; return; }
   const h = location.hash, id = ++restoring, until = Date.now() + 8000;
-  const stop = () => { if (restoring === id) restoring = 0; removeEventListener("wheel", stop); removeEventListener("touchstart", stop); removeEventListener("keydown", stop); };
+  const stop = () => { if (restoring === id) { restoring = 0; const m = $("#main"); if (m) m.style.minHeight = ""; } removeEventListener("wheel", stop); removeEventListener("touchstart", stop); removeEventListener("keydown", stop); };
   addEventListener("wheel", stop, { passive: true }); addEventListener("touchstart", stop, { passive: true }); addEventListener("keydown", stop);
   const step = () => {
     if (restoring !== id || location.hash !== h) return stop();
@@ -847,6 +849,13 @@ function restoreScroll(k) {
   };
   setTimeout(step, 50);
 }
+
+// a tap on the screen's title (or the empty part of the top bar) goes back to the top, as in the native apps
+addEventListener("click", (e) => {
+  const bar = e.target.closest?.(".topbar");
+  if (!bar || e.target.closest("button, a, input, select, textarea, [data-act]") || bar.closest(".deck, .modal, #detail")) return;
+  scrollTo({ top: 0, behavior: calmMotion() ? "auto" : "smooth" });
+});
 
 /* ---------- helpers for actions ---------- */
 // A link to the post in Skybee itself; the desktop app has no web address, so it gives the site's one
@@ -978,11 +987,17 @@ document.addEventListener("click", async (e) => {
           ...(p.viewer?.bookmarked ? [{ act: "bmFolder", label: "📁 Закладки: у папку…" }] : []),
           ...(!mine && p.author.viewer?.following ? [{ act: "hideFromHome", label: X.hiddenFromHome().has(p.author.did) ? "👁️ Знову показувати в «Підписках»" : `🙈 Приховати ${at(p.author.handle)} із «Підписок» (без відписки)` }] : []),
           { act: "muteThread", label: p.viewer?.threadMuted ? "🔔 Не приховувати гілку" : "🔕 Приховати гілку" },
+          { act: "followThread", label: notify.threadSubs()[rootUri || p.uri] ? "🔔 Не стежити за відповідями в гілці" : "🔔 Стежити за новими відповідями в гілці" },
+          ...(!mine ? (() => { const z = X.snoozeList().find(x => x.did === p.author.did);
+            return [{ act: "snooze", label: z?.until > Date.now() ? `⏳ Повернути ${at(p.author.handle)} у стрічки` : `⏳ Відкласти ${at(p.author.handle)} на кілька днів…` },
+              { act: "noReposts", label: z?.reposts ? `🔁 Знову показувати поширення ${at(p.author.handle)}` : `🔁 Не показувати поширення ${at(p.author.handle)}` }]; })() : []),
           "-",
           // the thread's author may hide a reply for everyone, the author of a quoted post may detach the quote
           ...(!mine && rootUri?.startsWith(my) ? [{ act: "hideReply", label: hiddenReplies.has(p.uri) ? "👁️ Показати відповідь усім" : "🙈 Приховати відповідь для всіх" }] : []),
           ...(!mine && quoted?.uri?.startsWith(my) && quoted.$type === "app.bsky.embed.record#viewRecord" ? [{ act: "detach", label: "✂️ Від'єднати мій пост від цитати" }] : []),
           ...(mine ? [
+            // Bluesky has no editing: the text goes back into the editor, and after the new post is out the old one is deleted
+            ...(!p.record?.reply && !p.embed ? [{ act: "editPost", label: "✏️ Виправити (видалити й опублікувати наново)" }] : []),
             { act: "pin", label: p.viewer?.pinned ? "📌 Відкріпити з профілю" : "📌 Закріпити в профілі" },
             { act: "gate", label: "💬 Хто може відповідати й цитувати" },
             { act: "delete", label: "🗑️ Видалити пост", danger: true },
@@ -1024,9 +1039,38 @@ document.addEventListener("click", async (e) => {
         if (c === "bmFolder") {
           const have = Object.keys(X.folders());
           const n = prompt("Назва папки закладок" + (have.length ? ` (є: ${have.join(", ")}; порожньо — прибрати з папок)` : ""), X.folderOf(p.uri)[0] || "");
-          if (n != null) { X.removeFromFolders(p.uri); if (n.trim()) { X.addToFolder(n, p.uri); toast("Додано в папку «" + n.trim().slice(0, 40) + "» 📁"); } else toast("Прибрано з папок"); }
+          if (n != null) { X.removeFromFolders(p.uri); if (n.trim()) { X.addToFolder(n, p.uri); toast("Додано в папку «" + n.trim().slice(0, 40) + "» 📁"); } else toast("Прибрано з папок"); X.pushFolders(); }
         }
         if (c === "hideFromHome") { const on = X.toggleHiddenFromHome(p.author.did); toast(on ? "Більше не показуватиму в «Підписках» (підписку збережено)" : "Знову показуватиму в «Підписках»"); }
+        if (c === "followThread") {
+          const key = rootUri || p.uri, subs = notify.threadSubs();
+          if (subs[key]) { delete subs[key]; notify.saveThreadSubs(subs); toast("Більше не стежу за гілкою"); }
+          else {
+            if (Object.keys(subs).length >= 10) { toast("Можна стежити не більше ніж за 10 гілками"); return; }
+            const { thread } = await api.get("app.bsky.feed.getPostThread", { uri: key, depth: 10, parentHeight: 0 });
+            subs[key] = { n: notify.countReplies(thread) }; notify.saveThreadSubs(subs);
+            toast(notify.enabled() ? "Стежу за гілкою: сповіщу про нові відповіді 🔔" : "Стежу за гілкою, але сповіщення вимкнені — увімкни їх у налаштуваннях");
+          }
+        }
+        if (c === "snooze") {
+          const z = X.snoozeList().find(x => x.did === p.author.did);
+          if (z?.until > Date.now()) { X.snooze(p.author.did, p.author.handle, 0); toast("Знову показуватиму в стрічках"); }
+          else {
+            const d = parseInt(prompt(`На скільки днів відкласти ${p.author.handle}? Її/його пости зникнуть зі стрічок і повернуться самі.`, "7"));
+            if (d > 0) { X.snooze(p.author.did, p.author.handle, d); toast(`Відкладено на ${d} дн.`); }
+          }
+        }
+        if (c === "noReposts") {
+          const z = X.snoozeList().find(x => x.did === p.author.did);
+          X.muteReposts(p.author.did, p.author.handle, !z?.reposts); toast(z?.reposts ? "Поширення знову видно" : "Поширення цього акаунта приховано в стрічках");
+        }
+        if (c === "editPost" && await confirmBox("Bluesky не вміє редагувати пости. Skybee опублікує нову версію, а старий пост видалить після цього: його лайки, поширення й відповіді втратяться, а згадки й посилання доведеться перевірити.", "Виправити", true)) {
+          const t = p.record?.text || "";
+          openComposer({ text: t.length < 270 ? t + "\n\n✏️ виправлено" : t }, async () => {
+            try { await api.deletePost(p.uri); toast("Стару версію видалено"); } catch { toast("Нову версію опубліковано, але старий пост видалити не вдалося"); }
+            reloadView();
+          });
+        }
         if (c === "gate") editGate(p);
         if (c === "delete" && await confirmBox("Видалити цей пост назавжди?", "Видалити", true)) {
           await api.deletePost(p.uri); document.querySelectorAll(`[data-uri="${CSS.escape(p.uri)}"]`).forEach(x => x.remove()); toast("Пост видалено");

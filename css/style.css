@@ -1294,7 +1294,7 @@ nav.bottom a:hover { text-decoration: none; }
   :root[data-ui="glass"].glass-float nav.bottom a[data-nav="#/search"] .bl { display: none; }
   :root[data-ui="glass"].glass-float nav.bottom a[data-nav="#/search"].on { color: var(--accent-mark); }
   /* minimized while reading: only the current tab stays, the capsule hugs it */
-  :root[data-ui="glass"].glass-float.tab-min nav.bottom { padding-right: calc(100% - 70px); }
+  :root[data-ui="glass"].glass-float.tab-min nav.bottom { padding-left: 8px; padding-right: calc(100% - 64px); } /* the icon sits in the middle of the 64px capsule */
   :root[data-ui="glass"].glass-float.tab-min nav.bottom::before { right: calc(100% - 64px); }
   :root[data-ui="glass"].glass-float.tab-min nav.bottom a:not(.on):not([data-nav="#/search"]) { display: none; }
   :root[data-ui="glass"].glass-float.tab-min nav.bottom a.on .bl { display: none; }
@@ -1997,3 +1997,6 @@ article.post[hidden], article.post.bm-out { display: none !important; }
 :root[data-font-style="bolditalic"] input,
 :root[data-font-style="bolditalic"] textarea,
 :root[data-font-style="bolditalic"] select { font-style: italic; font-weight: 700; }
+
+/* a long menu on a phone never reaches past the screen edges */
+.popmenu { max-width: calc(100vw - 16px); }

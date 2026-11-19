@@ -8,6 +8,7 @@ import { getLang } from "./compose.js";
 import * as push from "./push.js";
 import { UI_LANGS, uiLang, setUiLang, isUk, sortAZ } from "./i18n.js";
 import * as notify from "./notify.js";
+import * as X from "./extras.js";
 import { inkFor, colorsOf } from "./flair.js";
 
 // App colour (Settings → Оформлення → Колір): replaces the gold accent. Any colour works; these are the quick picks
@@ -484,6 +485,8 @@ export async function media(el) {
       ${toggle("sbbadge", "Значок Skybee біля мого імені", store.get("skybee.badge") === "1", "Інші користувачі Skybee бачать біля вашого імені нашу бджолу (у вашому репозиторії зберігається позначка). Вимкнете — позначку буде прибрано")}
       ${toggle("postcolors", "Кольори профілів на постах", store.get("skybee.postColors") !== "0", "Пости людей з оформленням Skybee — на м'якому градієнті їхнього профілю")}
       <p class="small muted">Оформлення Skybee безпечне для твоєї IP-адреси: чужі записи читаються через публічний кеш, а іграшка — з CDN, тож сервер власника профілю тебе не бачить.</p>
+      ${toggle("bmsync", "Папки закладок в акаунті", store.get("skybee.bmSync") === "1", "Папки зберігаються в записі вашого акаунта й з'являються на інших пристроях. Увага: запис публічний — будь-хто зможе побачити назви папок і які пости в них лежать, хоча самі закладки в Bluesky приватні")}
+      ${toggle("botfilter", "Ховати підозрілі відповіді", store.get("skybee.botFilter") === "1", "У гілках: акаунти без аватарки, зовсім нові або з нікнеймом із купою цифр — під згорткою «Підозрілі відповіді». Це припущення, не вирок")}
       ${toggle("players", "Вбудовані плеєри", store.get("skybee.players") !== "0", "YouTube, Spotify, SoundCloud, Vimeo, Twitch, Apple Music грають прямо в пості — після натискання ▶")}
       ${toggle("extmedia", "Показувати картки посилань із зображеннями", store.get("skybee.noLinkThumbs") !== "1")}
     </div>`;
@@ -499,6 +502,8 @@ export async function media(el) {
   $("#tenorkey", el).onchange = (e) => { store.set("skybee.tenorKey", e.target.value.trim() || null); toast(e.target.value.trim() ? "Ключ збережено — шукай GIF кнопкою «GIF» у редакторі" : "Ключ прибрано"); };
   $("#sbbadge", el).onchange = async (e) => { store.set("skybee.badge", e.target.checked ? "1" : "0"); toast("Збережено"); (await import("./flair.js")).syncBadge(); };
   $("#postcolors", el).onchange = (e) => { store.set("skybee.postColors", e.target.checked ? null : "0"); toast("Збережено — діє на нових екранах"); };
+  $("#bmsync", el).onchange = (e) => { store.set("skybee.bmSync", e.target.checked ? "1" : null); toast(e.target.checked ? "Папки зберігатимуться в акаунті (публічно)" : "Папки лишилися лише на цьому пристрої"); e.target.checked ? X.pushFolders() : X.dropFolderRecord(); };
+  $("#botfilter", el).onchange = (e) => { store.set("skybee.botFilter", e.target.checked ? "1" : null); toast("Збережено — діє на нових екранах"); };
   $("#players", el).onchange = (e) => { store.set("skybee.players", e.target.checked ? null : "0"); toast("Збережено"); };
   $("#extmedia", el).onchange = (e) => { store.set("skybee.noLinkThumbs", e.target.checked ? null : "1"); document.body.classList.toggle("nolinkthumbs", !e.target.checked); toast("Збережено"); };
 }
