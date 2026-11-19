@@ -1569,6 +1569,8 @@ body.calm .plist > * { animation: none !important; }
 .actions button { font-size: 14px; flex: 0 0 auto; }
 .actions button span { overflow: visible; text-overflow: clip; }
 @media (max-width: 400px) { .actions button { padding-left: 5px; padding-right: 5px; } }
+/* very narrow screens (320–360px): tighter buttons so the last one never leaves the card */
+@media (max-width: 360px) { :root[data-ui] .actions button:has(span) { min-width: 0; } :root[data-ui] .actions button { padding-left: 3px; padding-right: 3px; gap: 3px; font-size: 13px; } }
 :root[data-ui="material"] .actions svg { width: 22px; height: 22px; }
 
 /* Material: top bar icons 24dp inside 48dp round targets, as in Google's apps */
