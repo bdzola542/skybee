@@ -9,6 +9,10 @@ import {
   leave, ico,
 } from "./ui.js";
 import * as notify from "./notify.js";
+import { initProfileCard } from "./profilecard.js";
+import { pickDate } from "./datepicker.js";
+import { swipeDeck } from "./swipedeck.js";
+import { liveTrends } from "./trends.js";
 import * as flair from "./flair.js";
 import * as src from "./sources.js";
 import * as X from "./extras.js";
@@ -372,6 +376,17 @@ export async function postUsers(el, { actor, rkey, kind }) {
   });
 }
 
+/* ✉️ and the follow button on someone's profile. Anyone may write → the ✉️ is simply there. Nobody → none. Only people
+   they follow (the default) → the ✉️ is hidden until they follow you back and you follow them, then it slides in
+   (the card moves in js/profilecard.js). */
+function dmAndFollow(p, blocked) {
+  const allow = p.associated?.chat?.allowIncoming;
+  const dm = `<button class="ghost sm icon" data-act="dm" data-did="${esc(p.did)}" title="Написати">✉️</button>`;
+  if (blocked || allow === "none") return followBtn(p);
+  if (allow === "all") return dm + followBtn(p);
+  return `<span class="pc-acts"><span class="pc-slot">${dm}</span>${followBtn(p)}</span>`;
+}
+
 /* ================= PROFILE ================= */
 export async function profile(el, { actor, tab = "posts" }) {
   el.innerHTML = header("Профіль", true) + spinner();
@@ -388,19 +403,19 @@ export async function profile(el, { actor, tab = "posts" }) {
   const site = p.website && /^https?:\/\//.test(p.website) ? p.website : "";
   el.innerHTML = header(name(p), true, `<button class="ghost icon" data-act="profileMenu" data-did="${p.did}">⋯</button>`) + `
     <div class="banner" ${p.banner ? `style="background-image:url('${esc(p.banner)}')"` : ""}></div>
-    <div class="phead">
+    <div class="phead" data-pc="${esc(p.did)}">
       <div class="row between">
         <div class="bigava" ${p.avatar ? `data-act="lightboxOne" role="button" tabindex="0" aria-label="Відкрити аватарку" data-full="${esc(p.avatar)}"` : ""}>${avatar(p, 88)}</div>
         <div class="row">
           ${me ? `<button class="ghost sm" data-act="editFlair" title="Статус, музика, колір та іграшка — для користувачів Skybee">✨ Оформлення</button><button class="ghost sm" data-act="editProfile">Редагувати профіль</button>`
-               : `${!blocked && p.associated?.chat?.allowIncoming !== "none" ? `<button class="ghost sm icon" data-act="dm" data-did="${p.did}" title="Написати">✉️</button>` : ""}${followBtn(p)}`}
+               : dmAndFollow(p, blocked)}
         </div>
       </div>
       <h1>${vname(p)}</h1>
       <div class="muted">${at(p.handle)}${p.pronouns ? ` · ${esc(p.pronouns)}` : ""} ${v.followedBy && v.following ? '<span class="pill">Взаємна підписка</span>' : v.followedBy ? '<span class="pill">Стежить за вами</span>' : ""} ${v.muted ? '<span class="pill">Приховано</span>' : ""}${v.mutedByList ? ` <a class="pill" href="#/list/${enc(v.mutedByList.uri)}">Приховано списком «${esc(v.mutedByList.name)}»</a>` : ""}${v.blockingByList ? ` <a class="pill" href="#/list/${enc(v.blockingByList.uri)}">Заблоковано списком «${esc(v.blockingByList.name)}»</a>` : ""}</div>
       ${labelPills(p) ? `<div>${labelPills(p)}</div>` : ""}
       ${blocked ? "" : `<div class="counts">
-        <a href="${profileHref(p)}/followers"><b>${num(p.followersCount)}</b> читачів</a>
+        <a href="${profileHref(p)}/followers"><b data-fc>${(p.followersCount || 0).toLocaleString(LOC)}</b> читачів</a>
         <a href="${profileHref(p)}/follows"><b>${num(p.followsCount)}</b> підписок</a>
         <span><b>${num(p.postsCount)}</b> постів</span></div>
       ${p.description ? `<div class="bio">${linkify(p.description)}</div>` : ""}
@@ -411,6 +426,7 @@ export async function profile(el, { actor, tab = "posts" }) {
     </div>
     ${blocked ? empty(v.blocking ? "Ви заблокували цей акаунт" : "Цей акаунт заблокував вас") :
       `<div class="tabs scroll">${tabs.map(([k, l]) => `<a class="${k === tab ? "on" : ""}" href="${profileHref(p)}${k === "posts" ? "" : "/" + k}">${l}</a>`).join("")}</div><div id="pbody"></div>`}`;
+  initProfileCard(el.querySelector(".phead"), p); // avatar pop, rolling follower count, ✉️ appearing once the person follows you back
   if (blocked) return;
   // a swipe sideways over the profile switches the tab (posts ↔ replies ↔ media …); not from the left edge (that is «Back»)
   if (el.isConnected) {
@@ -790,7 +806,7 @@ export async function search(el, { q = "", tab = "top" }) {
   el.innerHTML = header("Пошук") + `
     <form class="searchbar"><input type="search" placeholder="Пошук постів, людей, фідів" value="${esc(text)}" autofocus>
       <details class="sfilters"${nOps ? " open" : ""}><summary class="small">⚙️ Фільтри${nOps ? ` (${nOps})` : ""}</summary>
-        <div class="sfgrid">${SOPS.map(([k, l, ph]) => `<label class="field">${l}<input data-op="${k}" ${k === "since" || k === "until" ? `type="date" value="${esc((ops[k] || "").slice(0, 10))}"` : `value="${esc(ops[k] || "")}" placeholder="${ph}"`} autocapitalize="none"></label>`).join("")}</div>
+        <div class="sfgrid">${SOPS.map(([k, l, ph]) => `<label class="field">${l}<input data-op="${k}" ${k === "since" || k === "until" ? `type="text" readonly data-date placeholder="Обрати дату" value="${esc((ops[k] || "").slice(0, 10))}"` : `value="${esc(ops[k] || "")}" placeholder="${ph}"`} autocapitalize="none"></label>`).join("")}</div>
         <div class="row end"><button type="button" class="ghost sm" data-clearops>Скинути</button><button class="btn sm">Шукати</button></div>
       </details></form>
     ${q ? `<div class="tabs">${[["top", "Топ"], ["latest", "Найновіші"], ["people", "Люди"], ["feeds", "Фіди"]].map(([k, l]) =>
@@ -803,6 +819,12 @@ export async function search(el, { q = "", tab = "top" }) {
     const v = parts.filter(Boolean).join(" ");
     if (v) location.hash = `#/search?q=${enc(v)}&tab=${tab === "people" || tab === "feeds" ? "top" : tab}`;
   };
+  // a date is chosen on drum wheels (js/datepicker.js)
+  el.querySelectorAll("[data-date]").forEach(i => {
+    const ask = async () => { const v = await pickDate(i.value, i.closest("label").firstChild.textContent.trim()); if (v != null) i.value = v; };
+    i.addEventListener("click", ask);
+    i.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ask(); } });
+  });
   el.querySelector("[data-clearops]").onclick = () => el.querySelectorAll("[data-op]").forEach(i => { i.value = ""; });
   const body = $("#sbody", el);
   // people matching what is being typed
@@ -821,11 +843,17 @@ export async function search(el, { q = "", tab = "top" }) {
     }, 250);
   });
   if (!q) {
-    body.innerHTML = `<div id="explore"></div><h3 class="pad">Кого почитати</h3>`;
+    body.innerHTML = `<div id="explore"></div><div class="pad" id="deckbox"></div><h3 class="pad">Кого почитати</h3>`;
     explore($("#explore", body)).catch(() => {});
+    // people as a deck of cards: swipe right to follow, left to skip (js/swipedeck.js)
+    if (api.session) api.get("app.bsky.actor.getSuggestions", { limit: 12 }).then(d => swipeDeck($("#deckbox", body), d.actors)).catch(() => $("#deckbox", body)?.remove());
+    else $("#deckbox", body)?.remove();
     const tr = await api.get("app.bsky.unspecced.getTrendingTopics", {}).catch(() => null);
-    if (tr?.topics?.length) body.insertAdjacentHTML("afterbegin", `<div class="pad"><h3>Тренди</h3><div class="chips">${tr.topics.slice(0, 12).map(t =>
-      `<a class="chip" href="${t.link?.startsWith("/profile/") && t.link.includes("/feed/") ? "#/feed/" + enc("at://" + t.link.split("/")[2] + "/app.bsky.feed.generator/" + t.link.split("/").pop()) : "#/search?q=" + enc(t.topic)}">${esc(t.topic)}</a>`).join("")}</div></div>`);
+    const chip = (t) => `<a class="chip" href="${t.link?.startsWith("/profile/") && t.link.includes("/feed/") ? "#/feed/" + enc("at://" + t.link.split("/")[2] + "/app.bsky.feed.generator/" + t.link.split("/").pop()) : "#/search?q=" + enc(t.topic)}">${esc(t.topic)}</a>`;
+    if (tr?.topics?.length) {
+      body.insertAdjacentHTML("afterbegin", `<div class="pad"><h3>Тренди</h3><div class="chips" id="trendchips">${tr.topics.slice(0, 12).map(chip).join("")}</div></div>`);
+      liveTrends($("#trendchips", body), async () => (await api.get("app.bsky.unspecced.getTrendingTopics", {})).topics, chip); // the chips swap places when the ranking changes
+    }
     return paged(body, async (cursor) => {
       const d = await api.get("app.bsky.actor.getSuggestions", { limit: 25, cursor });
       return { html: d.actors.map(a => renderActor(a)), cursor: d.cursor };

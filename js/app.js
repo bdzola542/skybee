@@ -14,8 +14,16 @@ import * as N from "./newbie.js";
 import * as X from "./extras.js";
 import * as TL from "./tools.js";
 import * as U from "./updates.js";
-import { bee, isLive, $, esc, calmMotion, posts, actors, pwa, toast, menu, closeMenu, confirmBox, modal, lightbox, attachVideo, webUrl, avatar, name, actionsBar, gateLine, hiddenReplies, at, num, ico } from "./ui.js";
+import { bee, isLive, $, esc, calmMotion, successPill, shake, posts, actors, pwa, toast, menu, closeMenu, confirmBox, modal, lightbox, attachVideo, webUrl, avatar, name, actionsBar, gateLine, hiddenReplies, at, num, ico } from "./ui.js";
 import { openComposer, openGateEditor } from "./compose.js";
+import { gooMenu } from "./goomenu.js";
+import { lensTo, rubber } from "./rubberdock.js";
+import { followChanged } from "./profilecard.js";
+import { roll } from "./rollcount.js";
+import { ticket } from "./ticket.js";
+import "./limitfields.js"; // the letter-limit ring on every limited text field
+import "./morphselect.js"; // drop-downs that grow out of their button
+import "./dockcard.js"; // a second tap on the current tab opens a card of quick actions
 
 try { S.applyLook(); } catch {}
 try { import("./appicon.js").then(m => m.applyIcon()); } catch {}
@@ -86,11 +94,13 @@ function bindLogin(f) {
     btn.disabled = true; err.textContent = ""; btn.textContent = "Вхід…";
     try {
       await api.login(f.handle.value, f.pass.value, { main: f.kind.value === "main", code: f.code.value, confirmServer });
+      await successPill(btn); // the button folds into a ✓ before the app opens
       // a page reload needs the session in storage; where storage is blocked, carry on in memory
       let stored = false; try { stored = !!localStorage.getItem("skybee.session"); } catch {}
       if (stored) restart(); else { document.querySelectorAll(".modal-bg").forEach(m => m.remove()); location.hash = "#/"; boot(); }
     } catch (ex) {
       err.textContent = ex.code === "Cancelled" ? "" : errText(ex);
+      if (ex.code !== "Cancelled") shake(f); // the form shakes its head
       if (ex.code === "AuthFactorTokenRequired") { f.kind.value = "main"; sync(); f.code.hidden = false; f.code.focus(); }
     }
     btn.disabled = false; btn.textContent = "Увійти";
@@ -291,6 +301,7 @@ function sideProfile(p) {
     </div>`;
 }
 
+let gooList = []; // the goo menus of the current shell (destroyed when the shell is built again)
 function shell() {
   app.innerHTML = `
   <nav class="side">
@@ -308,6 +319,16 @@ function shell() {
   <section id="detail" aria-label="Пост"></section>
   <nav class="bottom">${NAV.filter((_, i) => [0, 1, 3, 2, 8].includes(i)).map(([h, i, l, b]) => `<a href="${h}" data-nav="${h}" aria-label="${l}"><span class="ni">${ico(i, 26)}${b ? `<i class="dot" id="m${b}"></i>` : ""}</span><span class="bl">${l}</span></a>`).join("")}</nav>
   <button class="fab" data-act="compose" title="Новий пост">${ico("pen", 24)}<span class="fl">Новий пост</span></button>`;
+  // the round ✏️ button pours out bubbles (Skybee and Liquid Glass looks; Material keeps the plain button)
+  gooList.forEach(g => g.destroy()); gooList = []; document.querySelectorAll(".goo").forEach(e => e.remove());
+  const gooRun = id => {
+    openComposer({}, reloadView);
+    const pick = { photo: "input[type=file]", gif: "[data-c=gif]", drafts: "[data-c=drafts]" }[id];
+    if (pick) document.querySelector(`.composer ${pick}`)?.click();
+  };
+  gooList.push(gooMenu(app.querySelector(".fab"), gooRun, { on: () => document.documentElement.dataset.ui !== "material" }));
+  // the «Новий пост» button of the side menu pours its bubbles to the right
+  gooList.push(gooMenu(app.querySelector(".compose-side"), gooRun, { on: () => document.documentElement.dataset.ui !== "material" && !document.body.classList.contains("drawer"), angles: [-72, -38, -4, 30], blob: false, cross: false }));
 }
 
 /* ---------- badges ---------- */
@@ -319,12 +340,12 @@ async function badges() {
   let count = null, convos = null;
   try {
     ({ count } = await api.get("app.bsky.notification.getUnreadCount"));
-    for (const id of ["nbadge", "mnbadge"]) { const d = document.getElementById(id); if (d) { d.textContent = count > 30 ? "30+" : count || ""; d.hidden = !count; } }
+    for (const id of ["nbadge", "mnbadge"]) { const d = document.getElementById(id); if (d) { const t = String(count > 30 ? "30+" : count || ""); if ((d.dataset.v ?? d.textContent) !== t) roll(d, d.dataset.v ?? d.textContent, t); d.hidden = !count; } }
   } catch (e) { console.warn("Skybee: unread count", e?.code || e?.status || e); } // background: the next round retries; the counters keep their last value
   try {
     ({ convos } = await api.chat("chat.bsky.convo.listConvos", { limit: 50 }));
     const c = convos.reduce((s, x) => s + (x.muted ? 0 : x.unreadCount), 0);
-    for (const id of ["cbadge", "mcbadge"]) { const e = document.getElementById(id); if (e) { e.textContent = c || ""; e.hidden = !c; } }
+    for (const id of ["cbadge", "mcbadge"]) { const e = document.getElementById(id); if (e) { const t = String(c || ""); if ((e.dataset.v ?? e.textContent) !== t) roll(e, e.dataset.v ?? e.textContent, t); e.hidden = !c; } }
   } catch (e) { console.warn("Skybee: chats", e?.code || e?.status || e); }
   badgesBusy = false;
   // a failed count is not «0 unread»: that would make the next real count look like new notifications
@@ -457,7 +478,7 @@ async function route() {
     on ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"); // the current section is said, not only shown
   });
   document.documentElement.classList.remove("tab-min", "fab-min", "scrolled", "feeds-hide"); // a new screen starts with the full bars
-  placeLens($("nav.bottom a.on"));
+  placeLens($("nav.bottom a.on")); placeSide();
   main._grid?.abort(); main._swipe?.abort(); // the screen element is reused: the old screen's touch/click listeners go
   flair.untint(main); // leaving a profile (or a post): its colour goes at once, not when the next screen has loaded
   main.innerHTML = "";
@@ -517,28 +538,6 @@ window.addEventListener("skybee:report", (e) => reportDialog(e.detail));
 // pinned feeds changed: the right column's list and the home tabs are built again
 window.addEventListener("skybee:tabsChanged", () => { V.forgetHomeTabs(); const b = $("#sidebox"); if (b) M.sidebar(b).catch(() => {}); });
 
-/* ---------- Liquid Glass: the lens flows like a drop ----------
-   Moving to another tab, the lens stretches along the way and settles with a little wobble (iOS 26); other styles,
-   «Зменшити анімацію» and a first placement just move it. */
-function liquid(lens, x) {
-  const from = lens._x;
-  lens._x = x;
-  lens.style.setProperty("--lx", x + "px");
-  if (from == null || Math.abs(from - x) < 3 || document.documentElement.dataset.ui !== "glass" || calmMotion() || !lens.animate) return;
-  const w = lens.offsetWidth || 60, d = Math.min(Math.abs(x - from) / w, 2);
-  const mid = from + (x - from) * .55;
-  lens._anim?.cancel();
-  lens.classList.add("flow"); // the css transition of the move steps aside while this animation plays (they fought: the bubble jerked and smeared)
-  const a = lens._anim = lens.animate([
-    { transform: `translateX(${from}px) scale(1, 1)` },
-    { transform: `translateX(${mid}px) scale(${1 + .09 * d}, ${1 - .04 * d})`, offset: .45 },
-    { transform: `translateX(${x + (x > from ? 2 : -2)}px) scale(.99, 1.01)`, offset: .8 },
-    { transform: `translateX(${x}px) scale(1, 1)` },
-  ], { duration: 340 + 40 * d, easing: "cubic-bezier(.25,.8,.35,1)" });
-  const end = () => { if (lens._anim === a) lens.classList.remove("flow"); };
-  a.onfinish = a.oncancel = end;
-}
-
 /* ---------- Liquid Glass: the light on the glass follows the tilt of the phone (or the mouse on a computer) ----------
    --gx/--gy (−1.6…1.6) move the bright rim of every glass surface (css: --lg-rim). The tilt needs «Відблиск від нахилу»
    (Налаштування → Оформлення; iPhone asks for the motion sensor once); the mouse works by itself. */
@@ -566,13 +565,25 @@ function placeLens(a) {
   if (!a || !a.offsetWidth) { lens.style.opacity = "0"; return; }
   lens.style.opacity = "1";
   const inset = 3; // a little air from the capsule edge, so the bubble never touches it or the search circle
-  lens.style.width = a.offsetWidth - inset * 2 + "px";
   // from the boxes on screen, not offsetLeft: the same in every browser, whatever the tab's own scale or position
   const r = a.getBoundingClientRect(); // its centre: a pressed tab (scale .94) keeps its centre, not its edges
   const x = r.left + r.width / 2 - a.offsetWidth / 2 - bar.getBoundingClientRect().left - bar.clientLeft;
-  liquid(lens, Math.round(x + inset));
+  lensTo(lens, Math.round(x + inset), a.offsetWidth - inset * 2); // the pill stretches like rubber (js/rubberdock.js)
 }
-addEventListener("resize", () => placeLens($("nav.bottom a.on")));
+// The side menu (computer, and the ☰ menu of a phone): a pill under the current item stretches along the column when it moves
+// (Side nav: the edge in front 560/34, the edge behind 220/21). Skybee and Liquid Glass.
+function placeSide() {
+  const nav = $("nav.side"); if (!nav) return;
+  const ui = document.documentElement.dataset.ui;
+  let lens = nav.querySelector(":scope > .sidelens");
+  const a = (ui === "skybee" || ui === "glass") && nav.querySelector("a[data-nav].on");
+  if (!a || !a.offsetHeight) { lens?.remove(); return; }
+  if (!lens) { lens = document.createElement("span"); lens.className = "sidelens"; lens.setAttribute("aria-hidden", "true"); nav.prepend(lens); }
+  lens.style.left = a.offsetLeft + "px"; lens.style.width = a.offsetWidth + "px";
+  lensTo(lens, a.offsetTop, a.offsetHeight, { axis: "y", lead: [560, 34], trail: [220, 21], squash: false });
+}
+addEventListener("resize", () => { placeLens($("nav.bottom a.on")); placeSide(); });
+new MutationObserver(() => placeSide()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-ui"] });
 // The tabs change size after the bubble was placed — fonts arrive, a badge appears, the bar collapses or expands —
 // so it is placed again whenever the bar or a tab changes size, after the fonts load and after every bar animation
 {
@@ -642,16 +653,14 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
     if (a && a !== drag.cur) {
       drag.cur?.classList.remove("peek");
       drag.cur = a; a.classList.add("peek");
-      const lens = drag.bar.querySelector(".navlens");
-      if (lens) lens.style.width = a.offsetWidth - 6 + "px"; // the bubble takes the size of the tab under it
       navigator.vibrate?.(6);
     }
-    // the bubble goes with the finger itself (not tab by tab), then settles under the tab on release
+    // the bubble goes with the finger itself (not tab by tab) and takes the size of the tab under it; past the ends of
+    // the bar a rubber band holds it back; it springs under the tab on release
     const lens = drag.bar.querySelector(".navlens");
     if (lens) {
-      const b = drag.bar.getBoundingClientRect(), w = lens.offsetWidth;
-      const x = Math.max(3, Math.min(e.clientX - b.left - w / 2, b.width - w - 3));
-      lens._anim?.cancel(); lens.classList.remove("flow"); lens._x = x; lens.style.setProperty("--lx", x + "px");
+      const b = drag.bar.getBoundingClientRect(), w = (drag.cur || drag.from)?.offsetWidth - 6 || lens.offsetWidth;
+      lensTo(lens, rubber(e.clientX - b.left - w / 2, 3, b.width - w - 3), w, { drag: true });
     }
   }, { passive: true });
   const finish = () => {
@@ -682,19 +691,27 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
   const glass = () => document.documentElement.dataset.ui === "glass";
   // where each row's bubble was last: a screen that redraws itself on a choice (settings) still sees the bubble slide
   const last = new Map(), keyOf = (row) => items(row).map(c => c.textContent.trim()).join("|").slice(0, 120);
+  // Tab pill (motion study): the pill under the chosen item stretches toward the new one — the edge in front is stiff,
+  // the one behind is lazy (620/40 and 170/19). Liquid Glass: a glass bubble everywhere; Skybee: a golden pill in Settings
+  const TAB_LEAD = [620, 40], TAB_TRAIL = [170, 19];
+  const settingsPage = () => location.hash.startsWith("#/settings");
+  // Liquid Glass: a glass bubble in every row. Skybee: the golden underline of tab rows stretches everywhere; the segmented controls of Settings get a pill
+  const kindOf = (row) => glass() ? "glass" : document.documentElement.dataset.ui !== "skybee" ? "" : row.classList.contains("tabs") ? "line" : settingsPage() ? "pill" : "";
+  const spring = (l, b, o) => { l.style.top = b.y + "px"; l.style.height = b.h + "px"; lensTo(l, b.x, b.w, { lead: TAB_LEAD, trail: TAB_TRAIL, squash: false, swellTo: 1.08, ...o }); };
   function place(row, target) {
     let lens = row.querySelector(":scope > .rowlens");
-    const a = glass() && (target || current(row));
+    const kind = kindOf(row), on = !!kind;
+    row.classList.toggle("sbpill", kind === "pill"); row.classList.toggle("sbline", kind === "line");
+    const a = on && (target || current(row));
     if (!a || !a.offsetWidth) { lens?.remove(); return; }
     const tab = row.classList.contains("tabs"), inset = tab ? 6 : 0;
-    const box = { x: a.offsetLeft + inset, w: a.offsetWidth - inset * 2, y: a.offsetTop + inset, h: a.offsetHeight - inset * 2 }; // tabs: a little air all round
-    const put = (l, b) => { liquid(l, b.x); l.style.width = b.w + "px"; l.style.top = b.y + "px"; l.style.height = b.h + "px"; };
-    if (!lens) { // new (or the row was redrawn): appear where the bubble last was, then slide on
+    let box = { x: a.offsetLeft + inset, w: a.offsetWidth - inset * 2, y: a.offsetTop + inset, h: a.offsetHeight - inset * 2 }; // tabs: a little air all round
+    if (kind === "line") { const w = Math.min(56, a.offsetWidth * .6); box = { x: a.offsetLeft + (a.offsetWidth - w) / 2, w, y: a.offsetTop + a.offsetHeight - 3, h: 3 }; } // the gold underline
+    if (!lens) { // new (or the row was redrawn): appear where the pill last was, then stretch on
       lens = document.createElement("span"); lens.className = "rowlens"; lens.setAttribute("aria-hidden", "true");
-      lens.style.transition = "none"; put(lens, last.get(keyOf(row)) || box); row.prepend(lens);
-      void lens.offsetWidth; lens.style.transition = "";
+      spring(lens, last.get(keyOf(row)) || box); row.prepend(lens);
     }
-    put(lens, box); if (!target) last.set(keyOf(row), box);
+    spring(lens, box); if (!target) last.set(keyOf(row), box);
     row.classList.toggle("rowfit", row.scrollWidth <= row.clientWidth + 1);
   }
   let queued = false;
@@ -725,8 +742,7 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
     const a = row.querySelector(`[data-tab="${from}"]`), b = row.querySelector(`[data-tab="${to}"]`);
     if (!a || !b) return;
     const inset = 6, x = a.offsetLeft + (b.offsetLeft - a.offsetLeft) * p + inset, w = a.offsetWidth + (b.offsetWidth - a.offsetWidth) * p - inset * 2;
-    lens._anim?.cancel(); lens.style.transition = "none"; lens._x = x;
-    lens.style.setProperty("--lx", x + "px"); lens.style.width = w + "px";
+    lensTo(lens, x, w, { drag: true, squash: false, swellTo: 1 });
   }, { passive: true });
   let drag = null;
   const under = (row, x) => items(row).find(c => { const r = c.getBoundingClientRect(); return x >= r.left && x <= r.right; });
@@ -753,12 +769,11 @@ addEventListener("resize", () => placeLens($("nav.bottom a.on")));
     const c = under(drag.row, e.clientX), lens = drag.row.querySelector(":scope > .rowlens");
     if (c && c !== drag.cur) {
       drag.cur?.classList.remove("peek"); drag.cur = c; c.classList.add("peek"); navigator.vibrate?.(6);
-      if (lens) { lens.style.width = c.offsetWidth - (drag.row.classList.contains("tabs") ? 12 : 0) + "px"; }
     }
-    if (lens) { // the bubble follows the finger smoothly; it settles under the item on release
-      const b = drag.row.getBoundingClientRect(), w = lens.offsetWidth;
+    if (lens) { // the bubble follows the finger smoothly (and takes the size of the item under it); it settles under the item on release
+      const b = drag.row.getBoundingClientRect(), cc = drag.cur || c, w = cc ? cc.offsetWidth - (drag.row.classList.contains("tabs") ? 12 : 0) : lens.offsetWidth;
       const x = Math.max(0, Math.min(e.clientX - b.left - w / 2, drag.row.clientWidth - w));
-      lens._anim?.cancel(); lens.classList.remove("flow"); lens._x = x; lens.style.setProperty("--lx", x + "px");
+      lensTo(lens, x, w, { drag: true, squash: false, swellTo: 1.08 });
     }
   }, { passive: true });
   addEventListener("pointerup", () => end(true), { passive: true });
@@ -780,32 +795,47 @@ addEventListener("pointerdown", (e) => {
 }, { passive: true });
 
 /* ---------- pull to refresh (touch screens) ---------- */
-// At the very top of a screen, pulling down and letting go reloads it
+// At the very top of a screen, pulling down and letting go reloads it. The ↻ rides on springs ("Pull to refresh" study): it follows
+// the finger with a rubber band (900/50), parks at the top while the screen reloads, then springs back up (260/18).
 {
-  let y0 = null, x0 = 0, dy = 0, ind = null;
+  const THRESHOLD = 88, PARK = 52;
+  let y0 = null, x0 = 0, dy = 0, ind = null, loading = false;
+  let y = 0, v = 0, t = 0, k = 900, c = 50, raf = 0, last = 0;
+  const band = (d) => 110 * (1 - 1 / (d * .6 / 110 + 1)); // rubber: the more you pull, the less it moves
+  const draw = () => { if (ind) ind.style.transform = `translate(-50%, ${y.toFixed(1)}px) rotate(${loading ? 0 : Math.min(dy / THRESHOLD, 1) * 270}deg)`; };
+  const frame = (now) => {
+    const dt = Math.min((now - last) / 1000, 1 / 30); last = now;
+    for (let i = 0; i < 4; i++) { v += (-k * (y - t) - c * v) * dt / 4; y += v * dt / 4; }
+    draw();
+    if (ind && !loading && t < 0 && y < -30) { ind.remove(); ind = null; } // flew back up: gone
+    raf = ind && (y0 != null || loading || Math.abs(y - t) > .3 || Math.abs(v) > 1) ? requestAnimationFrame(frame) : 0;
+  };
+  const wake = () => { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } };
+  const aim = (target, kk, cc) => { t = target; k = kk; c = cc; wake(); };
   addEventListener("touchstart", (e) => {
     x0 = e.touches[0].clientX;
-    y0 = scrollY <= 0 && e.touches[0].clientX > 32 && !document.querySelector(".modal-bg:not(.leaving), .msheet-bg:not(.leaving)") && !document.body.classList.contains("deckmode") && e.target.closest?.("main") ? e.touches[0].clientY : null;
+    y0 = !loading && scrollY <= 0 && e.touches[0].clientX > 32 && !document.querySelector(".modal-bg:not(.leaving), .msheet-bg:not(.leaving)") && !document.body.classList.contains("deckmode") && e.target.closest?.("main") ? e.touches[0].clientY : null;
     dy = 0;
   }, { passive: true });
   addEventListener("touchmove", (e) => {
     if (y0 == null) return;
     dy = e.touches[0].clientY - y0;
     // a sideways swipe (switching feeds, a carousel) is never a pull: once the finger goes more sideways than down, it is off
-    if (Math.abs(e.touches[0].clientX - x0) > Math.max(16, dy)) { y0 = null; dy = 0; ind?.remove(); ind = null; return; }
-    if (dy <= 0 || scrollY > 0) { ind?.remove(); ind = null; return; }
-    if (!ind) { ind = document.createElement("div"); ind.className = "ptr"; ind.textContent = "↻"; document.body.appendChild(ind); }
-    const p = Math.min(dy / 80, 1);
-    ind.style.transform = `translate(-50%, ${Math.min(dy, 110) * .6}px) rotate(${p * 270}deg)`;
-    ind.classList.toggle("ready", p >= 1);
+    if (Math.abs(e.touches[0].clientX - x0) > Math.max(16, dy)) { y0 = null; dy = 0; if (ind) { ind.classList.remove("ready"); aim(-60, 260, 18); } return; }
+    if (dy <= 0 || scrollY > 0) { if (ind) { ind.classList.remove("ready"); aim(-60, 260, 18); } return; }
+    if (!ind) { ind = document.createElement("div"); ind.className = "ptr"; ind.innerHTML = '<span class="pi">↻</span>'; document.body.appendChild(ind); y = -40; v = 0; }
+    aim(band(dy) * .6 + 0, 900, 50); // follows the finger without lag
+    ind.classList.toggle("ready", dy >= THRESHOLD);
   }, { passive: true });
-  addEventListener("touchend", () => {
-    if (ind) {
-      const go = ind.classList.contains("ready");
-      ind.classList.add("spin"); setTimeout(() => { ind?.remove(); ind = null; }, go ? 700 : 0);
-      if (go) route();
-    }
-    y0 = null;
+  addEventListener("touchcancel", () => { y0 = null; if (ind && !loading) { ind.classList.remove("ready"); aim(-60, 260, 18); } }, { passive: true });
+  addEventListener("touchend", async () => {
+    const was = y0 != null; y0 = null;
+    if (!ind || !was) return;
+    if (ind.classList.contains("ready")) {
+      loading = true; ind.classList.add("spin"); aim(PARK, 300, 20); // parks and spins while the screen reloads (at least a moment, so it reads as a refresh)
+      try { await Promise.all([route(), new Promise(r => setTimeout(r, 700))]); } catch {}
+      loading = false; dy = 0; aim(-60, 260, 18);
+    } else aim(-60, 260, 18);
   }, { passive: true });
 }
 
@@ -866,7 +896,13 @@ const refreshPostEl = (uri) => {
   // re-render action bars of every copy of this post on screen
   const p = posts.get(uri);
   document.querySelectorAll(`[data-uri="${CSS.escape(uri)}"] > .body > .actions, [data-uri="${CSS.escape(uri)}"] > .actions`)
-    .forEach(bar => { bar.outerHTML = actionsBar(p, bar.classList.contains("big")); });
+    .forEach(bar => {
+      const old = [...bar.querySelectorAll("button[data-act]")].map(b => b.querySelector("span")?.textContent);
+      bar.insertAdjacentHTML("afterend", actionsBar(p, bar.classList.contains("big")));
+      const nb = bar.nextElementSibling; bar.remove();
+      // a counter that changed rolls from the old number to the new one
+      [...nb.querySelectorAll("button[data-act]")].forEach((b, i) => { const s = b.querySelector("span"); if (s && old[i] != null && old[i] !== s.textContent) roll(s, old[i], s.textContent); });
+    });
 };
 
 async function reloadView() { const y = scrollY; await route(); scrollTo(0, y); }
@@ -1086,6 +1122,7 @@ document.addEventListener("click", async (e) => {
         const r = await api.follow(did);
         const a = actors.get(did); if (a) a.viewer = { ...(a.viewer || {}), following: r.uri };
         actEl.outerHTML = `<button class="ghost sm" data-act="unfollow" data-did="${did}" data-uri="${r.uri}">Ви стежите</button>`;
+        followChanged(did, true);
         break;
       }
       case "unfollow": {
@@ -1095,6 +1132,7 @@ document.addEventListener("click", async (e) => {
         await api.unfollow(uri);
         const a = actors.get(did); if (a?.viewer) a.viewer.following = undefined;
         actEl.outerHTML = `<button class="btn sm" data-act="follow" data-did="${did}">Стежити</button>`;
+        followChanged(did, false);
         break;
       }
       case "unblock": {
@@ -1224,14 +1262,18 @@ function reportDialog(subject) {
 export function shareDialog(title, hash, bskyUrl) {
   const sky = here() + hash;
   const m = modal(`<h3>📤 ${title}</h3>
-    <div class="qr"><img alt="QR-код" src="https://api.qrserver.com/v1/create-qr-code/?size=440x440&margin=12&data=${encodeURIComponent(sky)}"></div>
-    <p class="hint center">Наведи камеру телефона — відкриється в Skybee, навіть без входу</p>
+    <div class="qr" data-ticket><div class="tk-front"><img alt="QR-код" src="https://api.qrserver.com/v1/create-qr-code/?size=440x440&margin=12&data=${encodeURIComponent(sky)}"></div>
+      <div class="tk-back"><b>${bee(22)} Skybee</b><span class="tk-url noi18n">${esc(sky)}</span><small class="muted">Торкнись картки, щоб перевернути</small></div></div>
+    <p class="hint center">Наведи камеру телефона — відкриється в Skybee, навіть без входу. Картку можна перевернути й побачити посилання</p>
+    <button class="ghost wide" data-flip>🔄 Перевернути картку</button>
     <div class="col" style="align-items:stretch">
       <button class="btn" data-copy="${esc(sky)}">${bee(18)} Копіювати посилання Skybee</button>
       ${bskyUrl ? `<button class="ghost wide" data-copy="${esc(bskyUrl)}">🔗 Копіювати посилання bsky.app</button>` : ""}
       ${navigator.share ? `<button class="ghost wide" data-native>Інші застосунки…</button>` : ""}
     </div>`);
+  const tk = ticket(m.querySelector("[data-ticket]"));
   m.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-flip]")) tk.flip();
     const c = e.target.closest("[data-copy]");
     if (c) { await navigator.clipboard.writeText(c.dataset.copy); toast("Скопійовано"); }
     if (e.target.closest("[data-native]")) navigator.share({ url: sky }).catch(() => {});

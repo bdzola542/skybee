@@ -1,7 +1,7 @@
 // Skybee service worker: keeps the app shell available offline and shows notification clicks the way.
 // Network first — a new deploy is picked up at once; the cache is only a fallback without a connection.
 const CACHE = "skybee-shell-v21";
-const SHELL = ["./", "css/style.css", "js/app.js", "js/api.js", "js/ui.js", "js/views.js", "js/compose.js", "js/more.js", "js/settings.js", "js/notify.js", "js/push.js", "js/extras.js", "js/tools.js", "js/flair.js", "js/sources.js", "js/deck.js", "js/splash.js", "js/errors.js", "js/newbie.js", "js/native.js", "js/stars.js", "js/updates.js", "js/appicon.js", "js/i18n.js",
+const SHELL = ["./", "css/style.css", "js/app.js", "js/api.js", "js/ui.js", "js/views.js", "js/compose.js", "js/mentionpicker.js", "js/letterlimit.js", "js/spring.js", "js/goomenu.js", "js/rubberdock.js", "js/profilecard.js", "js/wheelpicker.js", "js/datepicker.js", "js/rollcount.js", "js/pullcord.js", "js/glasslens.js", "js/ticket.js", "js/trends.js", "js/swipedeck.js", "js/dockcard.js", "js/morphselect.js", "js/jellyslider.js", "js/limitfields.js", "js/more.js", "js/settings.js", "js/notify.js", "js/push.js", "js/extras.js", "js/tools.js", "js/flair.js", "js/sources.js", "js/deck.js", "js/splash.js", "js/errors.js", "js/newbie.js", "js/native.js", "js/stars.js", "js/updates.js", "js/appicon.js", "js/i18n.js",
   "fonts/Zakon-Regular.ttf", "fonts/Zakon-Italic.ttf", "fonts/Zakon-Bold.ttf", "fonts/Zakon-BoldItalic.ttf",
   "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon.svg", "icons/favicon.svg", "favicon.ico", "offline.html"];
 
