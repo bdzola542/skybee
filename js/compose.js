@@ -1,9 +1,12 @@
 // Skybee — post composer
 import { errText } from "./errors.js";
 import * as api from "./api.js";
-import { sortAZ, locale } from "./i18n.js";
+import { sortAZ, locale, t } from "./i18n.js";
 import * as scheduler from "./push.js";
 import * as X from "./extras.js";
+import { mentionPicker } from "./mentionpicker.js";
+import { letterLimit } from "./letterlimit.js";
+import { wheelPicker } from "./wheelpicker.js";
 import { esc, modal, toast, avatar, name, richText, spinner, at } from "./ui.js";
 
 const LANGS = sortAZ([["uk", "Українська"], ["en", "English"], ["pl", "Polski"], ["be", "Беларуская"], ["ru", "Русский"], ["de", "Deutsch"], ["cs", "Čeština"], ["es", "Español"], ["ja", "日本語"]]);
@@ -104,15 +107,30 @@ const draft = {
 };
 
 // opts: { replyTo: postView, quote: postView, text }
-// asks for the time of a scheduled post: resolves with a Date or null
+// asks for the day and time of a scheduled post with drum wheels (day · hour · minute): resolves with a Date or null
 function pickTime() {
   return new Promise((res) => {
-    const d = new Date(Date.now() + 3600e3); d.setMinutes(0, 0, 0);
-    const v = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-    let done = false; const fin = (x) => { if (!done) { done = true; res(x); } };
+    const base = new Date(); base.setHours(0, 0, 0, 0);
+    const first = new Date(Date.now() + 3600e3); first.setMinutes(0, 0, 0); // the next full hour
+    const days = Array.from({ length: 90 }, (_, i) => {
+      const d = new Date(base); d.setDate(d.getDate() + i);
+      return { value: String(i), label: i === 0 ? t("Сьогодні") : i === 1 ? t("Завтра") : d.toLocaleDateString(locale, { weekday: "short", day: "numeric", month: "short" }) };
+    });
+    const nums = (n) => Array.from({ length: n }, (_, i) => ({ value: String(i), label: String(i).padStart(2, "0") }));
+    const columns = [
+      { id: "day", label: t("День"), options: days, width: "150px" },
+      { id: "hour", label: t("Година"), loop: true, options: nums(24), width: "64px" },
+      { id: "minute", label: t("Хвилини"), loop: true, options: nums(60), width: "64px" },
+    ];
+    let value = { day: String(Math.round((new Date(first).setHours(0, 0, 0, 0) - base.getTime()) / 864e5)), hour: String(first.getHours()), minute: String(first.getMinutes()) };
+    const when = () => { const d = new Date(base); d.setDate(d.getDate() + +value.day); d.setHours(+value.hour, +value.minute, 0, 0); return d; };
+    let wp = null, done = false; const fin = (x) => { if (!done) { done = true; res(x); } };
     const m = modal(`<h3>Запланувати пост</h3><p class="muted small">Сервер Skybee опублікує його сам, навіть коли застосунок закрито.</p>
-      <input type="datetime-local" value="${v}" data-when><p class="err"></p><div class="schedlist" data-sl></div>
-      <div class="row between"><button class="ghost" data-x="0">Скасувати</button><button class="btn" data-x="1">Запланувати</button></div>`, { onClose: () => fin(null) });
+      <div data-wheel></div><p class="small noi18n" data-sum style="text-align:center;margin:8px 0"></p><p class="err"></p><div class="schedlist" data-sl></div>
+      <div class="row between"><button class="ghost" data-x="0">Скасувати</button><button class="btn" data-x="1">Запланувати</button></div>`, { onClose: () => { wp?.destroy(); fin(null); } });
+    const sum = () => { m.querySelector("[data-sum]").textContent = when().toLocaleString(locale, { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" }); };
+    wp = wheelPicker(m.querySelector("[data-wheel]"), { columns, value, label: t("Коли опублікувати"), onChange: (v) => { value = v; sum(); } });
+    sum();
     // already scheduled posts: shown here, each can be cancelled
     const sl = m.querySelector("[data-sl]");
     const draw = (items) => { sl.innerHTML = items.length ? `<p class="muted small">Уже заплановано:</p>` + items.map(i => `<div class="row between small"><span class="noi18n">${esc(new Date(i.at).toLocaleString(locale))} — ${esc(i.text.slice(0, 50))}</span><button class="ghost" data-del="${esc(i.id)}">✕</button></div>`).join("") : ""; };
@@ -122,9 +140,9 @@ function pickTime() {
       if (del) { try { await scheduler.unschedule(del); draw(await scheduler.scheduled()); } catch (ex) { m.querySelector(".err").textContent = errText(ex); } return; }
       const x = e.target.closest("[data-x]")?.dataset.x; if (!x) return;
       if (x === "0") return m.close();
-      const t = new Date(m.querySelector("[data-when]").value);
-      if (isNaN(t) || t.getTime() < Date.now() + 120e3) { m.querySelector(".err").textContent = "Обери час хоча б за 2 хвилини від зараз"; return; }
-      fin(t); m.close();
+      const at = when();
+      if (at.getTime() < Date.now() + 120e3) { m.querySelector(".err").textContent = "Обери час хоча б за 2 хвилини від зараз"; return; }
+      fin(at); m.close();
     });
   });
 }
@@ -177,13 +195,13 @@ export function openComposer(opts = {}, onDone) {
           <select data-warn title="Попередження про вміст медіа">${WARNINGS.map(([v, l]) => `<option value="${v}">${v ? "⚠️ " : ""}${l}</option>`).join("")}</select>
           ${replyTo ? "" : `<button class="ghost sm" data-c="gate" title="Хто може відповідати й цитувати">${gateLabel(allow)}</button>`}
         </div>
-        <div class="row"><span class="counter">0 / 300</span><button class="ghost icon" data-c="addpart" title="Додати ще один пост у гілку">＋</button></div>
+        <div class="row"><span class="counter" title="Скільки символів ще можна написати"></span><button class="ghost icon" data-c="addpart" title="Додати ще один пост у гілку">＋</button></div>
       </div>
     </div>`, {
     wide: true,
     canClose: mayClose, // Esc or a click outside must not silently drop a draft
     onClose: () => {
-      busy?.abort();
+      busy?.abort(); lim.destroy();
       if (plain && !sentAny) draft.set(thread.length === 1 ? ta.value.trim() : "");
       for (const x of all()) for (const f of [...x.images, x.video]) if (f) URL.revokeObjectURL(f.url);
     },
@@ -220,11 +238,40 @@ export function openComposer(opts = {}, onDone) {
     send.textContent = sendLabel();
     ta.placeholder = cur ? "Продовження гілки" : replyTo ? "Напиши відповідь" : "Що нового?";
   };
+  /* @nick chips in the text: a layer behind the textarea repeats its text (invisible) and paints the chosen @nicks.
+     Only backgrounds are drawn, so nothing moves: the textarea stays the one real field (drafts, threads, facets). */
+  const wrap = document.createElement("div"), mirror = document.createElement("div");
+  wrap.className = "tawrap"; mirror.className = "tamirror"; mirror.setAttribute("aria-hidden", "true");
+  ta.before(wrap); wrap.append(mirror, ta);
+  const lim = letterLimit(counter, ta, { limit: 300, floorOf: () => m.querySelector(".composer") || ta });
+  const picked = new Set(); let popAt = -1;
+  const popFrames = (() => { // the "pop" spring from the mention study (520 / 16), sampled once
+    let x = .6, v = 0, t = 0; const f = [];
+    for (let i = 0; i < 90; i++) { for (let k = 0; k < 4; k++) { v += (-520 * (x - 1) - 16 * v) * (1 / 240); x += v / 240; } t = i / 89; f.push({ transform: `scale(${x.toFixed(3)})`, offset: t }); }
+    return f;
+  })();
+  const paint = () => {
+    const txt = ta.value; let html = "", last = 0, pop = null;
+    for (const m of txt.matchAll(/(^|[\s(])@([\w.-]+)/g)) {
+      const at0 = m.index + m[1].length, h = m[2].replace(/\.+$/, "");
+      if (!picked.has(h.toLowerCase())) continue;
+      html += esc(txt.slice(last, at0)) + `<span class="mchip" ${at0 === popAt ? "data-pop" : ""}>@${esc(h)}</span>`;
+      last = at0 + 1 + h.length;
+    }
+    mirror.innerHTML = html + esc(txt.slice(last)) + "\n";
+    mirror.style.paddingRight = `${ta.offsetWidth - ta.clientWidth}px`;
+    mirror.scrollTop = ta.scrollTop;
+    if (popAt > -1 && (pop = mirror.querySelector("[data-pop]"))) {
+      popAt = -1;
+      if (!matchMedia("(prefers-reduced-motion: reduce)").matches && !document.body.classList.contains("calm")) pop.animate(popFrames, { duration: 700, easing: "linear" });
+    }
+  };
+  ta.addEventListener("scroll", () => { mirror.scrollTop = ta.scrollTop; });
   let cardTimer;
   const update = () => {
+    paint();
     const n = api.graphemes(ta.value);
-    counter.textContent = `${n} / 300`;
-    counter.classList.toggle("over", n > 300);
+    lim.set(n);
     send.disabled = !!busy || n > 300 || !dirty();
     addBtn.disabled = !!busy || n > 300 || !filled(snapshot()) || thread.length >= MAX_THREAD;
     clearTimeout(cardTimer);
@@ -240,7 +287,7 @@ export function openComposer(opts = {}, onDone) {
     thread[cur] = snapshot();
     const x = thread[i]; thread[i] = null; cur = i;
     ta.value = x.text; images.length = 0; images.push(...x.images); video = x.video; card = x.card; cardFor = x.cardFor;
-    mentions.innerHTML = "";
+    picker.hide();
     renderParts(); renderPreviews(); renderCard(); update(); ta.focus();
   };
   // forgets posts that are already published, so that a retry continues the thread after them
@@ -249,27 +296,38 @@ export function openComposer(opts = {}, onDone) {
     renderParts(); update();
   };
 
-  /* @mention suggestions */
+  /* @mention suggestions: an animated list (js/mentionpicker.js); arrows and Enter/Tab choose, Esc closes */
   let mentionTimer;
   const mentionAt = () => ta.value.slice(0, ta.selectionStart).match(/(^|[\s(])@([\w.-]{1,40})$/);
+  const picker = mentionPicker(mentions, {
+    build: a => `${avatar(a, 28)}<span class="who"><b>${name(a)}</b><span class="muted small">${at(a.handle)}</span></span>`,
+    onPick: a => {
+      const hit = mentionAt(); if (!hit) return;
+      const end = ta.selectionStart, start = end - hit[2].length;
+      ta.setRangeText(a.handle + " ", start, end, "end");
+      picked.add(a.handle.toLowerCase()); popAt = start;
+      picker.hide(); ta.focus(); update();
+    },
+  });
   ta.addEventListener("input", () => {
+    lim.cut();
     update();
     clearTimeout(mentionTimer);
     const hit = mentionAt();
-    if (!hit) { mentions.innerHTML = ""; return; }
+    if (!hit) { picker.hide(); return; }
     mentionTimer = setTimeout(async () => {
       try {
         const d = await api.get("app.bsky.actor.searchActorsTypeahead", { q: hit[2], limit: 5 });
         if (mentionAt()?.[2] !== hit[2]) return;
-        mentions.innerHTML = d.actors.map(a => `<button type="button" class="actor plain" data-handle="${esc(a.handle)}">${avatar(a, 28)}<div class="who"><b>${name(a)}</b><span class="muted small">${at(a.handle)}</span></div></button>`).join("");
-      } catch { mentions.innerHTML = ""; }
+        picker.show(d.actors);
+      } catch { picker.hide(); }
     }, 200);
   });
-  mentions.addEventListener("click", e => {
-    const b = e.target.closest("[data-handle]"), hit = mentionAt(); if (!b || !hit) return;
-    const end = ta.selectionStart, start = end - hit[2].length;
-    ta.setRangeText(b.dataset.handle + " ", start, end, "end");
-    mentions.innerHTML = ""; ta.focus(); update();
+  ta.addEventListener("keydown", e => {
+    if (!picker.isOpen || e.isComposing) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); picker.move(e.key === "ArrowDown" ? 1 : -1); }
+    else if ((e.key === "Enter" || e.key === "Tab") && !e.ctrlKey && !e.metaKey) { e.preventDefault(); picker.pick(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); picker.hide(); }
   });
   renderParts(); update();
 
@@ -363,7 +421,7 @@ export function openComposer(opts = {}, onDone) {
         if (b.dataset.d === "use") { const d = X.drafts().find(x => x.id === id); if (d && (!dirty() || confirm("Замінити поточний текст чернеткою?"))) {
           if (d.parts?.length > 1) { // a whole thread: the first post is opened, the rest wait under it
             thread.length = 0; thread.push(null, ...d.parts.slice(1).map(text => ({ text, images: [], video: null, card: null, cardFor: null }))); cur = 0;
-            images.length = 0; video = null; card = null; cardFor = null; mentions.innerHTML = ""; ta.value = d.parts[0]; renderParts(); renderPreviews(); renderCard();
+            images.length = 0; video = null; card = null; cardFor = null; picker.hide(); ta.value = d.parts[0]; renderParts(); renderPreviews(); renderCard();
           } else ta.value = d.text;
           update(); ta.dispatchEvent(new Event("input", { bubbles: true })); dm.close(); } }
       });

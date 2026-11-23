@@ -647,8 +647,9 @@ body:has(.chatbar) .fab { display: none !important; } /* in a chat (!important: 
 .ptr { position: fixed; top: 6px; left: 50%; z-index: 70; width: 38px; height: 38px; border-radius: 50%; background: var(--panel); border: 1px solid var(--line);
   display: flex; align-items: center; justify-content: center; font-size: 20px; color: var(--muted); box-shadow: 0 4px 14px rgba(0,0,0,.3); pointer-events: none; }
 .ptr.ready { color: var(--accent); }
-.ptr.spin { animation: ptrspin .6s linear infinite; }
-@keyframes ptrspin { to { transform: translate(-50%, 66px) rotate(360deg); } }
+.ptr .pi { display: inline-block; }
+.ptr.spin .pi { animation: ptrspin .6s linear infinite; }
+@keyframes ptrspin { to { transform: rotate(360deg); } }
 .chip.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); } button.chip { background: none; cursor: pointer; }
 
 /* ---------- moderation services ---------- */
@@ -1255,6 +1256,12 @@ nav.bottom a:hover { text-decoration: none; }
      (the separate «scale» property multiplied the move too in Safari: the bubble drifted right, more on every tab) */
   :root[data-ui="glass"] nav.bottom.dragging .navlens { transform: translateX(var(--lx, 0px)) scale(1.12); background: rgba(255,255,255,.2); transition-duration: .22s; }
   :root[data-ui="glass"] nav.bottom.dragging a.peek { color: var(--accent-mark); }
+  /* Rubber dock: the Skybee look gets the same stretchy pill under the current tab as the Liquid Glass bubble; the pill is driven by springs (js/rubberdock.js) */
+  :root[data-ui="skybee"] .navlens { display: block; position: absolute; z-index: 0; left: 0; top: 5px; bottom: calc(5px + var(--sab)); border-radius: 28px; pointer-events: none;
+    background: color-mix(in srgb, var(--accent) 20%, transparent); box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 24%, transparent); transition: opacity .2s; }
+  :root[data-ui="skybee"] nav.bottom a.on::after, :root[data-ui="skybee"] nav.bottom.dragging a.peek::after { display: none !important; }
+  :root[data-ui="skybee"] nav.bottom.dragging a.peek { color: var(--accent); }
+  .navlens.rb { transition: opacity .2s !important; will-change: transform, width; }
   /* Material / Skybee: the tab under the finger takes the indicator */
   :root[data-ui="material"] nav.bottom.dragging a.on:not(.peek) .ni { background: none; }
   :root[data-ui="material"] nav.bottom.dragging a.peek .ni { background: var(--m-c); }
@@ -2002,3 +2009,223 @@ article.post[hidden], article.post.bm-out { display: none !important; }
 
 /* a long menu on a phone never reaches past the screen edges */
 .popmenu { max-width: calc(100vw - 16px); }
+
+/* ---------- animated @mention list (js/mentionpicker.js) ---------- */
+.mpick { position: relative; height: 0; opacity: 0; overflow: hidden; border-radius: 16px; background: var(--panel); margin: 4px 0; pointer-events: none; will-change: height, opacity; }
+.mpick.is-open { pointer-events: auto; }
+.mpick .mp-hl { position: absolute; left: 4px; right: 4px; top: 0; height: 44px; border-radius: 12px; background: var(--hover); will-change: transform, height; }
+.mpick .mp-row { position: absolute; left: 4px; right: 4px; top: 0; height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; will-change: transform, opacity; -webkit-tap-highlight-color: transparent; }
+.mpick .mp-row .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.mpick .mp-row .who > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mpick .mp-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ---------- @nick chips in the composer text (layer behind the textarea) ---------- */
+.tawrap { position: relative; }
+.composer .tawrap textarea { position: relative; background: transparent; display: block; }
+.tamirror { position: absolute; inset: 0; padding: 12px 0; font: inherit; font-size: 18px; line-height: normal; white-space: pre-wrap; overflow-wrap: break-word; word-wrap: break-word; overflow: hidden; color: transparent; pointer-events: none; }
+.tamirror .mchip { display: inline-block; border-radius: 6px; background: color-mix(in srgb, var(--accent) 24%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 24%, transparent); transform-origin: 50% 60%; will-change: transform; }
+
+/* ---------- letter limit (js/letterlimit.js) ---------- */
+.llcount { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; font-weight: 600; transition: color .2s; }
+.llcount .cnum { display: inline-block; min-width: 3ch; will-change: transform; }
+.llmeter { width: 22px; height: 22px; transform: rotate(-90deg); will-change: transform; }
+.llmeter circle { fill: none; stroke-width: 2.6; }
+.lltrack { stroke: var(--line); }
+.llfill { stroke: var(--muted); stroke-linecap: round; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke .2s; }
+.llcount.is-near { color: var(--accent); } .llcount.is-near .llfill { stroke: var(--accent); }
+.llcount.is-full { color: var(--danger); } .llcount.is-full .llfill { stroke: var(--danger); }
+.llpile { position: fixed; inset: 0; z-index: 101; overflow: hidden; pointer-events: none; }
+.llpile span { position: absolute; left: 0; top: 0; width: 20px; height: 24px; margin: -12px 0 0 -10px; text-align: center; font-size: 18px; font-weight: 600; line-height: 24px; color: var(--danger); will-change: transform, opacity; transition: color .5s; }
+.llpile span.is-down { color: var(--muted); }
+
+/* ---------- goo menu on the round ✏️ button (js/goomenu.js): Skybee = fused liquid blobs, Liquid Glass = glass drops ---------- */
+.goo { position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 20; pointer-events: none; }
+.goo[hidden] { display: none; }
+.goo-layer, .goo-ui { position: absolute; left: -210px; top: -210px; width: 420px; height: 420px; }
+.goo[data-mode="skybee"] .goo-layer { filter: url(#sb-goo); }
+.goo .blob { position: absolute; left: 0; top: 0; width: 48px; height: 48px; border-radius: 50%; will-change: transform, opacity;
+  background: color-mix(in srgb, var(--text) 16%, var(--panel)); }
+.goo .blob.main { width: 56px; height: 56px; background: var(--accent); }
+.goo[data-mode="glass"] .blob.main { display: none; }
+.goo[data-mode="glass"] .blob:not(.main) { background: var(--lg-fill-2, rgba(255,255,255,.13)); border: 1px solid var(--g-edge, rgba(255,255,255,.22));
+  -webkit-backdrop-filter: var(--lg-filter, blur(14px) saturate(180%)); backdrop-filter: var(--lg-filter, blur(14px) saturate(180%));
+  box-shadow: var(--lg-rim, inset 0 1px 0 rgba(255,255,255,.4)), var(--lg-drop, 0 8px 22px rgba(0,0,0,.28)); }
+.gbtn { position: absolute; left: 0; top: 0; width: 48px; height: 48px; border: 0; background: none; color: var(--text); display: grid; place-items: center;
+  border-radius: 50%; cursor: pointer; pointer-events: none; touch-action: none; outline: none; will-change: transform, opacity; -webkit-tap-highlight-color: transparent; }
+.gbtn svg { width: 20px; height: 20px; display: block; }
+.gbtn:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.gtip { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translate(-50%, 4px) scale(.9); background: var(--panel); border: 1px solid var(--line); color: var(--text);
+  font-size: 12px; font-weight: 600; padding: 5px 9px; border-radius: 999px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s, transform .25s cubic-bezier(.34, 1.56, .64, 1); }
+.gbtn.hover .gtip, .gbtn:focus-visible .gtip { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.fab .gx { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transform: rotate(-90deg) scale(.6); pointer-events: none; transition: opacity .2s, transform .5s var(--ease-spring, cubic-bezier(.34, 1.36, .64, 1)); }
+.fab .gx svg { width: 24px; height: 24px; }
+.fab .ico { transition: opacity .2s; }
+.fab.goo-open .gx { opacity: 1; transform: none; }
+.fab.goo-open .ico { opacity: 0; }
+
+/* ---------- profile card motion (js/profilecard.js) ---------- */
+.pc-acts { display: inline-flex; align-items: center; }
+.pc-slot { display: inline-block; overflow: hidden; will-change: width, opacity; }
+.pc-slot .ghost { margin-right: 8px; will-change: transform; }
+.counts .dg { display: inline-block; height: 1.25em; overflow: hidden; vertical-align: bottom; }
+.counts .dg > span { display: block; will-change: transform; }
+.counts .dg i { display: block; height: 1.25em; font-style: normal; }
+.counts b[data-fc] { display: inline-flex; line-height: 1.25em; font-variant-numeric: tabular-nums; }
+
+/* ---------- Tab pill: the pill under the chosen item stretches (js/rubberdock.js, springs 620/40 and 170/19) ---------- */
+.rowlens.rb { transition: opacity .2s !important; will-change: transform, width; }
+/* Skybee look, Settings only: the row becomes a pill with a golden pill under the chosen item (as in the study) */
+:root[data-ui="skybee"] .sbpill { position: relative; flex-wrap: nowrap; gap: 2px; padding: 4px; border-radius: 999px; background: var(--panel); }
+:root[data-ui="skybee"] .sbpill > :not(.rowlens) { position: relative; z-index: 1; flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; border: 0; border-radius: 999px;
+  background: none; color: var(--muted); transition: color .25s; }
+:root[data-ui="skybee"] .sbpill > .on, :root[data-ui="skybee"] .sbpill > :has(:checked), :root[data-ui="skybee"] .sbpill > .peek { color: var(--accent-ink); background: none; border: 0; }
+:root[data-ui="skybee"] .sbpill .rowlens { display: block; position: absolute; left: 0; z-index: 0; padding: 0; margin: 0; flex: none; pointer-events: none; border-radius: 999px;
+  background: var(--accent); box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--accent) 75%, transparent); }
+
+/* ---------- wheel picker (js/wheelpicker.js): drum columns for the day and time of a scheduled post ---------- */
+.wp { position: relative; display: flex; justify-content: center; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); padding: 0 12px; user-select: none; -webkit-user-select: none; margin: 10px 0; }
+.wp-band { position: absolute; left: 8px; right: 8px; top: 50%; height: 36px; transform: translateY(-50%); border-radius: 10px; background: var(--hover); pointer-events: none; }
+.wp-tick { position: absolute; top: 50%; width: 4px; height: 1px; background: var(--muted); pointer-events: none; } .wp-tick.l { left: 2px; } .wp-tick.r { right: 2px; }
+.wp-col { position: relative; flex: none; width: 64px; cursor: grab; touch-action: none; border-radius: 10px; outline: none; }
+.wp-col:active { cursor: grabbing; }
+.wp-col:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.wp-mask { position: absolute; inset: 0; -webkit-mask-image: linear-gradient(to bottom, transparent, #000 34%, #000 66%, transparent); mask-image: linear-gradient(to bottom, transparent, #000 34%, #000 66%, transparent); }
+.wp-drum { position: absolute; inset: 0; perspective: 1000px; pointer-events: none; color: var(--muted); }
+.wp-drum.clip { color: var(--text); font-weight: 500; clip-path: inset(calc(50% - 18px) 0 calc(50% - 18px) 0); }
+.wp-turn { position: absolute; left: 0; right: 0; top: 50%; transform-style: preserve-3d; }
+.wp-row { position: absolute; left: 0; right: 0; top: -18px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+
+/* default font: the one of the device itself (the phone's own system font) */
+:root[data-font-family="system"] body,
+:root[data-font-family="system"] button,
+:root[data-font-family="system"] input,
+:root[data-font-family="system"] textarea,
+:root[data-font-family="system"] select { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important; }
+/* the flag of Ukraine before «Zakon» (a drawn flag: emoji flags show as letters on Windows) */
+.uaflag { display: inline-block; width: 1.2em; height: .8em; margin-right: .45em; vertical-align: -.05em; border-radius: 2px; background: linear-gradient(#0057b7 50%, #ffd700 50%); }
+
+/* ---------- rolling counters (js/rollcount.js) ---------- */
+.rolling { display: inline-flex; line-height: 1.25em; font-variant-numeric: tabular-nums; }
+.rolling .dg { display: inline-block; height: 1.25em; overflow: hidden; vertical-align: bottom; }
+.rolling .dg > span { display: block; will-change: transform; }
+.rolling .dg i { display: block; height: 1.25em; font-style: normal; }
+
+/* ---------- Tab pill in the tab rows of the Skybee look: the golden underline stretches (js/app.js, rubberdock.js) ---------- */
+:root[data-ui="skybee"] .sbline { position: relative; }
+:root[data-ui="skybee"] .sbline > :not(.rowlens) { position: relative; z-index: 1; }
+:root[data-ui="skybee"] .sbline > .on::after { display: none; }
+:root[data-ui="skybee"] .sbline .rowlens { display: block; position: absolute; left: 0; z-index: 2; padding: 0; margin: 0; flex: none; pointer-events: none; border-radius: 3px 3px 0 0;
+  background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 55%, transparent); }
+/* ---------- Side nav: the pill under the current item of the side menu ---------- */
+.sidelens { display: none; }
+:root[data-ui="skybee"] .sidelens, :root[data-ui="glass"] .sidelens { display: block; position: absolute; top: 0; z-index: 0; pointer-events: none; border-radius: 12px; background: var(--hover); will-change: transform, height; }
+:root[data-ui="skybee"] .sidelens::before { content: ""; position: absolute; left: 0; top: 22%; height: 56%; width: 3px; border-radius: 0 4px 4px 0; background: var(--accent); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent); }
+:root[data-ui="glass"] .sidelens { border-radius: 999px; background: color-mix(in srgb, #fff 10%, transparent); box-shadow: inset 0 1px 0 var(--g-hi); }
+:root[data-ui="skybee"] nav.side a:not(.logo), :root[data-ui="glass"] nav.side a:not(.logo) { position: relative; z-index: 1; }
+:root[data-ui="skybee"] nav.side a.on, :root[data-ui="glass"] nav.side a.on { background: none; box-shadow: none; }
+:root[data-ui="skybee"] nav.side a.on::before, :root[data-ui="glass"] nav.side a.on::before { display: none; }
+
+/* ---------- letter limit on ordinary fields (js/limitfields.js) ---------- */
+.fieldcount { display: flex; justify-content: flex-end; margin-top: 4px; }
+.fieldcount .llcount { font-size: 12px; }
+.fieldcount .llmeter { width: 18px; height: 18px; }
+
+/* ---------- jelly switches: the thumb stretches under the finger and lands with a bounce ---------- */
+:root:not([data-ui="material"]) .stoggle i::after { transition: transform .45s cubic-bezier(.34, 1.56, .64, 1), width .2s; }
+:root[data-ui="skybee"] .stoggle:active input:not(:disabled) + i::after { width: 27px; }
+:root[data-ui="skybee"] .stoggle:active input:checked:not(:disabled) + i::after { transform: translateX(11px); }
+:root[data-ui="glass"] .stoggle:active input:not(:disabled) + i::after { width: 34px; }
+:root[data-ui="glass"] .stoggle:active input:checked:not(:disabled) + i::after { transform: translateX(13px); }
+
+/* ---------- jelly slider with steps (js/jellyslider.js) ---------- */
+.jsl { padding: 30px 6px 0; user-select: none; -webkit-user-select: none; }
+.jsl-bar { position: relative; height: 26px; touch-action: none; cursor: pointer; }
+.jsl-track { position: absolute; left: 0; right: 0; top: 9px; height: 8px; border-radius: 999px; background: var(--line); }
+.jsl-fill { position: absolute; left: 0; top: 9px; height: 8px; width: 13px; border-radius: 999px; background: var(--accent); }
+.jsl-thumb { position: absolute; left: 0; top: 0; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); outline: none; will-change: transform; }
+.jsl-thumb::before { content: ""; position: absolute; inset: 0; border-radius: 50%; transform: scale(var(--sx, 1), var(--sy, 1)); background: inherit; }
+.jsl-thumb:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 60%, transparent); }
+.jsl-bub { position: absolute; left: 50%; bottom: 100%; padding: 4px 10px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 700; white-space: nowrap; opacity: 0; pointer-events: none; transform-origin: 50% 100%; }
+.jsl-lbls { display: flex; justify-content: space-between; margin-top: 8px; }
+.jsl-l { background: none; border: 0; padding: 4px 2px; font-size: 12px; color: var(--muted); }
+.jsl-l.on { color: var(--text); font-weight: 700; }
+
+/* ---------- hold button: a dangerous action is confirmed by holding (ui.js confirmBox) ---------- */
+.holdbtn { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.holdbtn .hold-fill { position: absolute; inset: 0; background: rgba(0,0,0,.28); transform: scaleX(0); transform-origin: 0 50%; pointer-events: none; }
+.holdbtn .hold-l { position: relative; transition: transform .2s; }
+.holdbtn.holding .hold-l { transform: scale(.96); }
+.holdbtn.done .hold-l::before { content: "✓ "; }
+
+/* ---------- morph select (js/morphselect.js) ---------- */
+select[hidden] { display: none !important; }
+.msel { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; text-align: left; cursor: pointer; }
+.msel .mst { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msel .msc { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .7; transition: transform .3s cubic-bezier(.34, 1.56, .64, 1); }
+.msel.open .msc { transform: rotate(180deg); }
+.msel:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.composer .tools .msel { width: auto; padding: 6px 10px; font-size: 14px; border-radius: 999px; }
+.mselmenu { position: fixed; z-index: 300; overflow: hidden; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 14px 40px rgba(0,0,0,.4); will-change: width, height; }
+.mselmenu .msl { position: absolute; left: 4px; right: 4px; top: 0; border-radius: 10px; background: var(--hover); pointer-events: none; will-change: transform, height; }
+.mselmenu .mso { position: absolute; left: 4px; right: 4px; display: flex; align-items: center; padding: 0 12px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; white-space: nowrap; will-change: transform, opacity; }
+.mselmenu .mso[aria-selected="true"] { font-weight: 700; }
+.mselmenu .mso:disabled { opacity: .4; cursor: default; }
+
+/* ---------- toast island (ui.js islandToast): a dot that grows into its pill ---------- */
+.toast.island { animation: none; box-sizing: border-box; overflow: hidden; display: flex; align-items: center; justify-content: center; padding-top: 0; padding-bottom: 0; text-align: center; }
+.toast.island .tin { display: inline-block; }
+
+/* ---------- dock card: the current tab morphs into a card of quick actions (js/dockcard.js) ---------- */
+.dockcard { position: fixed; z-index: 65; transform: translateX(-50%); overflow: hidden; padding: 8px; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 18px 46px rgba(0,0,0,.45); will-change: width, height; }
+:root[data-ui="glass"] .dockcard { background: var(--glass, var(--panel)); -webkit-backdrop-filter: blur(24px) saturate(180%); backdrop-filter: blur(24px) saturate(180%); border-color: var(--g-edge, var(--line)); }
+.dcitem { display: flex; align-items: center; width: 100%; height: 46px; padding: 0 14px; border: 0; border-radius: 14px; background: none; color: var(--text); font: inherit; font-weight: 600; text-align: left; white-space: nowrap; cursor: pointer; will-change: transform, opacity; }
+.dcitem:hover, .dcitem:focus-visible { background: var(--hover); outline: none; }
+
+/* ---------- swipe deck of people (js/swipedeck.js) ---------- */
+.sdeck h3 { margin: 0 0 10px; }
+.sd-stage { position: relative; height: 250px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.sd-card { position: absolute; left: 6%; right: 6%; top: 0; height: 230px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 20px 16px; box-sizing: border-box; text-align: center; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 10px 30px rgba(0,0,0,.3); cursor: grab; touch-action: none; will-change: transform; }
+.sd-card:active { cursor: grabbing; }
+.sd-card p { margin: 6px 0 0; color: var(--muted); }
+.sd-stamp { position: absolute; top: 14px; padding: 2px 10px; border: 2px solid; border-radius: 8px; font-weight: 800; letter-spacing: .06em; opacity: 0; pointer-events: none; }
+.sd-stamp.yes { left: 14px; color: var(--repost); transform: rotate(-10deg); } .sd-stamp.no { right: 14px; color: var(--danger); transform: rotate(10deg); }
+.sd-btns { display: flex; gap: 10px; justify-content: center; margin-top: 4px; }
+.sd-hint { text-align: center; margin: 8px 0 0; }
+
+/* ---------- parallax ticket: the share card tilts and flips (js/ticket.js) ---------- */
+.tk { perspective: 900px; cursor: pointer; }
+.tk-in { position: relative; display: grid; transform-style: preserve-3d; will-change: transform; }
+.tk-front, .tk-back { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: flex; align-items: center; justify-content: center; }
+.tk-front img { transform: translate(var(--tkx, 0), var(--tky, 0)); max-width: 100%; }
+.tk-back { transform: rotateY(180deg); flex-direction: column; gap: 10px; text-align: center; padding: 18px; box-sizing: border-box; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+.tk-back > b { display: inline-flex; align-items: center; gap: 6px; font-size: 18px; transform: translate(var(--tkx, 0), var(--tky, 0)); }
+.tk-url { word-break: break-all; font-size: 13px; color: var(--accent); user-select: text; -webkit-user-select: text; }
+
+/* ---------- glass lens in the photo viewer (js/glasslens.js) ---------- */
+.glens { position: fixed; left: 0; top: 0; width: 150px; height: 150px; border-radius: 50%; z-index: 5; pointer-events: none; background-repeat: no-repeat; will-change: transform, opacity;
+  border: 1.5px solid rgba(255,255,255,.55); box-shadow: 0 10px 30px rgba(0,0,0,.5), inset 0 0 22px rgba(255,255,255,.18), inset 0 2px 0 rgba(255,255,255,.5); }
+.glens::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at 30% 24%, rgba(255,255,255,.35), transparent 42%); }
+.lb-btn.on { background: var(--accent); color: var(--accent-ink); }
+.lens-on .lb-stage { cursor: none; }
+
+/* ---------- pull cord: a bulb that switches the theme (js/pullcord.js) ---------- */
+.cord-card { position: relative; }
+.cord { position: absolute; right: 18px; top: 0; width: 46px; height: 130px; }
+.cord svg { width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.cord-l { stroke: var(--muted); stroke-width: 2; }
+.cord-g { fill: var(--line); stroke: var(--muted); stroke-width: 1.5; } .cord-c { fill: var(--muted); }
+.cord-halo { fill: var(--accent); opacity: 0; transition: opacity .3s; }
+.cord.lit .cord-g { fill: #ffe9a8; stroke: #e0a800; } .cord.lit .cord-halo { opacity: .28; }
+.cord-btn { position: absolute; left: 0; right: 0; top: 30px; bottom: 0; background: none; border: 0; cursor: grab; touch-action: none; opacity: 0; }
+.cord-btn:focus-visible { opacity: 1; outline: 2px solid var(--accent); border-radius: 12px; }
+
+/* ---------- fixes after the interface check ---------- */
+.composer > .row.between { flex-wrap: nowrap; gap: 6px; }
+.composer > .row.between .btn, .composer > .row.between .ghost { white-space: nowrap; flex: none; }
+.composer > .row.between .btn { padding-left: 14px; padding-right: 14px; }
+:root:not([data-ui="material"]) .toast { width: max-content; max-width: calc(100vw - 32px); }
+.seg > *, .sbpill > * { white-space: nowrap; }
+@media (max-width: 640px) { :root[data-ui] .seg > *, .sbpill > * { font-size: clamp(11px, 3.1vw, 14px); } }
+.sdeck { padding-top: 10px; }
+.modal:focus-visible, .modal-bg [tabindex="-1"]:focus-visible, .lb:focus-visible { outline: none; }

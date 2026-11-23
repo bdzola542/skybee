@@ -30,6 +30,8 @@ function visibleAccent(c, theme) {
 import * as flair from "./flair.js";
 import { statusBarFor, isNative } from "./native.js";
 import * as upd from "./updates.js";
+import { jellySlider } from "./jellyslider.js";
+import { pullCord } from "./pullcord.js";
 import { iconColor, setIconColor, iconBg, setIconBg, beeSvg, svgUrl, ICON_COLORS } from "./appicon.js";
 
 const store = {
@@ -99,6 +101,8 @@ const row = (href, icon, label, extra = "") =>
   `<a class="srow" href="${href}"><span class="sicon">${IC[icon]}</span><span class="grow">${label}</span>${extra}<span class="schev">${IC.chev}</span></a>`;
 const toggle = (id, label, on, hint = "", disabled = false) =>
   `<label class="stoggle"><span class="grow">${label}${hint ? `<small class="muted">${hint}</small>` : ""}</span><input type="checkbox" id="${id}" ${on ? "checked" : ""} ${disabled ? "disabled" : ""}><i></i></label>`;
+// a step slider (js/jellyslider.js): items and the current value ride in data attributes, the slider is built after the page is drawn
+const slider = (attr, items, cur) => `<div data-jsl="${attr}" data-cur="${esc(cur)}" data-items="${esc(JSON.stringify(items))}"></div>`;
 const seg = (attr, items, cur) => `<div class="seg">${items.map(([v, l]) => `<button data-${attr}="${v}" class="${v === cur ? "on" : ""}">${l}</button>`).join("")}</div>`;
 
 /* ================= MAIN LIST ================= */
@@ -539,8 +543,8 @@ export function applyLook() {
   // interface style: Liquid Glass (iPhone by default) or Material Design (Android by default), each with its own options
   const ui = uiStyle();
   root.dataset.ui = ui;
-  const selectedFont = store.get("skybee.fontFamily") || "zakon";
-  root.dataset.fontFamily = selectedFont.startsWith("custom:") ? "custom" : "zakon";
+  const selectedFont = store.get("skybee.fontFamily") || "system"; // by default: the font of the device itself
+  root.dataset.fontFamily = selectedFont.startsWith("custom:") ? "custom" : selectedFont === "zakon" ? "zakon" : "system";
   root.dataset.fontStyle = ["regular", "italic", "bold", "bolditalic"].includes(store.get("skybee.fontStyle")) ? store.get("skybee.fontStyle") : "regular";
   if (selectedFont.startsWith("custom:")) activateUserFont(selectedFont.slice(7)).catch(() => toast("Не вдалося завантажити власний шрифт"));
   root.dataset.glass = store.get("skybee.glass") || "normal";
@@ -568,7 +572,7 @@ export async function appearance(el) {
     const theme = store.get("skybee.theme") || "dark", font = store.get("skybee.font") || "15", color = isHex(appColor()) ? appColor() : "";
     const icolor = iconColor(), ibg = iconBg(), uiPick = store.get("skybee.ui") || "auto", ui = uiStyle();
     el.innerHTML = header("Оформлення", true) + `
-      <div class="card"><h3>Тема</h3>${seg("th", [["system", "Як у системі"], ["dark", "Темна"], ["dim", "Сутінки"], ["light", "Світла"]], theme)}</div>
+      <div class="card cord-card"><h3>Тема</h3><div data-cord></div>${seg("th", [["system", "Як у системі"], ["dark", "Темна"], ["dim", "Сутінки"], ["light", "Світла"]], theme)}</div>
       <div class="card"><h3>Колір</h3><p class="muted small">Колір кнопок, перемикачів, позначок і активної вкладки — замість золотого.</p><div class="sb-swatches app">${
         [["", "Золотий — як у бджілки"], ...APP_COLORS].map(([c, n]) => `<button type="button" class="sb-sw${c ? "" : " none"}${c === color ? " on" : ""}" data-color="${c}" title="${n}" aria-label="${n}"${c ? ` style="background:${c}"` : ""}>${c ? "" : bee(18)}</button>`).join("")}<label class="sb-sw sb-any${color && !APP_COLORS.some(([c]) => c === color) ? " on" : ""}" title="Свій колір"${color && !APP_COLORS.some(([c]) => c === color) ? ` style="--own:${color}"` : ""}><input type="color" data-anycolor value="${isHex(color) ? color : "#ff4d4d"}"><b>+</b></label></div>
         <p class="muted small">${!color ? "Золотий — як у бджілки" : APP_COLORS.find(([c]) => c === color)?.[1] || `Свій колір ${color}`}</p></div>
@@ -576,13 +580,13 @@ export async function appearance(el) {
         ${seg("ibg", [["", "Світла"], ["dim", "Сутінки"], ["dark", "Темна"]], ibg)}<div class="sb-icons">${[["", "Золота — як є"], ...APP_COLORS.filter(([c]) => !isNative || ICON_COLORS.includes(c))].map(([c, n]) => `<button type="button" class="sb-ic${c === icolor ? " on" : ""}" data-icon="${c}" title="${n}" aria-label="${n}"><img alt="" src="${svgUrl(beeSvg(c, true, 112, ibg))}"></button>`).join("")}${isNative ? "" : `<label class="sb-ic sb-any${icolor && !APP_COLORS.some(([c]) => c === icolor) ? " on" : ""}" title="Свій колір"><input type="color" data-anyicon value="${icolor || "#ff4d4d"}">${icolor && !APP_COLORS.some(([c]) => c === icolor) ? `<img alt="" src="${svgUrl(beeSvg(icolor, true, 112, ibg))}">` : "<b>+</b>"}</label>`}</div></div>
       <div class="card"><h3>Вигляд стрічки</h3><p class="muted small">«Компактний» — багато постів на екрані, дрібні відступи й картинки. «Мозаїка» — режим сітки ▦ показує фото різної висоти, як Pinterest.</p>
         ${seg("fl", [["", "Звичайний"], ["compact", "Компактний"], ["mosaic", "Мозаїка"]], store.get("skybee.feedLook") || "")}</div>
-      <div class="card"><h3>Шрифт</h3><p class="muted small">Використовуй національний шрифт Zakon або встанови власний файл. Підтримуються TTF, OTF, WOFF і WOFF2.</p>
-        <div class="seg"><button type="button" data-fontfamily="zakon" class="${(store.get("skybee.fontFamily") || "zakon") === "zakon" ? "on" : ""}">Zakon</button><button type="button" data-fontfamily="custom" class="${(store.get("skybee.fontFamily") || "").startsWith("custom:") ? "on" : ""}">Мій шрифт</button></div>
+      <div class="card"><h3>Шрифт</h3><p class="muted small">За замовчуванням — шрифт вашого пристрою. Можна ввімкнути національний шрифт Zakon або встановити власний файл. Підтримуються TTF, OTF, WOFF і WOFF2.</p>
+        <div class="seg"><button type="button" data-fontfamily="system" class="${(store.get("skybee.fontFamily") || "system") === "system" ? "on" : ""}">Системний</button><button type="button" data-fontfamily="zakon" class="${store.get("skybee.fontFamily") === "zakon" ? "on" : ""}"><i class="uaflag" aria-hidden="true"></i>Zakon</button><button type="button" data-fontfamily="custom" class="${(store.get("skybee.fontFamily") || "").startsWith("custom:") ? "on" : ""}">Мій шрифт</button></div>
         ${userFonts.length ? `<label class="field">Встановлений шрифт<select id="userFontChoice">${userFonts.map(f => `<option value="${esc(f.id)}" ${store.get("skybee.fontFamily") === "custom:" + f.id ? "selected" : ""}>${esc(f.name)}</option>`).join("")}</select></label><button type="button" class="ghost sm danger" id="removeUserFont">Видалити вибраний шрифт</button>` : ""}
         <label class="field">Завантажити власні шрифти<input id="userFontUpload" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" multiple></label>
         <p class="muted small">Файли зберігаються лише на цьому пристрої. Можна додати кілька шрифтів і перемикатися між ними.</p>
         <p class="muted small">Накреслення:</p>${seg("fontstyle", [["regular", "Regular"], ["italic", "Regular Italic"], ["bold", "Bold"], ["bolditalic", "Bold Italic"]], store.get("skybee.fontStyle") || "regular")}</div>
-      <div class="card"><h3>Розмір тексту</h3>${seg("font", [["14", "Менший"], ["15", "Звичайний"], ["17", "Більший"], ["19", "Великий"]], font)}</div>
+      <div class="card"><h3>Розмір тексту</h3>${slider("font", [["14", "Менший"], ["15", "Звичайний"], ["17", "Більший"], ["19", "Великий"]], font)}</div>
       ${window.skybeeDesktop || window.Capacitor?.isNativePlatform?.() ? `<div class="card"><h3>Анімація запуску</h3>
         <p class="muted small">Бджола пролітає над лукою й сідає в логотип. Небо — за темою (уночі місяць і зорі) і кольором застосунку.</p>
         ${seg("intro", [["full", "Повна"], ["short", "Коротка"], ["off", "Без неї"]], store.get("skybee.intro") || "full")}</div>` : ""}
@@ -592,7 +596,7 @@ export async function appearance(el) {
         <div class="uipreview">${["glass", "material", "skybee"].map(v => `<button type="button" class="uipv uipv-${v}${ui === v ? " on" : ""}" data-ui="${v}" aria-label="${{ glass: "Liquid Glass", material: "Material Design", skybee: "Skybee" }[v]}"><i></i><i></i><i></i><b>${{ glass: "Liquid Glass", material: "Material", skybee: "Skybee" }[v]}</b></button>`).join("")}</div>
       </div>
       ${ui === "glass" ? `<div class="card"><h3>Liquid Glass</h3>
-        <div class="field">Скло${seg("glass", [["clear", "Прозоре"], ["normal", "Звичайне"], ["frost", "Матове"]], store.get("skybee.glass") || "normal")}</div>
+        <div class="field">Скло${slider("glass", [["clear", "Прозоре"], ["normal", "Звичайне"], ["frost", "Матове"]], store.get("skybee.glass") || "normal")}</div>
         ${toggle("glassFloat", "Плаваюча панель вкладок", store.get("skybee.glassFloat") !== "0", "Нижня панель — скляна капсула над стрічкою, як в iOS")}
         ${toggle("lgTilt", "Відблиск від нахилу", store.get("skybee.lgTilt") === "1", "Світлий край скла рухається, коли нахиляєш телефон. На комп'ютері світло й так іде за мишею")}
         ${toggle("lgRefract", "Заломлення", store.get("skybee.lgRefract") === "1", refractWorks() ? "Краї скла викривлюють те, що під ними, як справжня лінза. Більше навантажує відеокарту й батарею" : "Поки не показується на iPhone та iPad — Safari такого не вміє. Працює в застосунку для комп'ютера й на Android", !refractWorks())}
@@ -611,11 +615,16 @@ export async function appearance(el) {
     el.querySelectorAll("[data-icon]").forEach(b => b.onclick = () => { setIconColor(b.dataset.icon); draw(); });
     const anyI = el.querySelector("[data-anyicon]");
     if (anyI) anyI.onchange = () => { setIconColor(anyI.value); draw(); };
+    // a bulb on a cord: pull it to switch between the dark and the light theme (js/pullcord.js)
+    const cord = el.querySelector("[data-cord]");
+    if (cord) pullCord(cord, { lit: () => document.documentElement.dataset.theme === "light", toggle: () => { store.set("skybee.theme", document.documentElement.dataset.theme === "light" ? "dark" : "light"); applyLook(); setTimeout(draw, 700); } });
+    const JSL = { font: (v) => { store.set("skybee.font", v); applyLook(); }, glass: (v) => { store.set("skybee.glass", v); applyLook(); } };
+    el.querySelectorAll("[data-jsl]").forEach(h => jellySlider(h, { items: JSON.parse(h.dataset.items), value: h.dataset.cur, label: h.closest(".card,.field")?.querySelector("h3")?.textContent || "", onChange: JSL[h.dataset.jsl] }));
     el.querySelectorAll("[data-font]").forEach(b => b.onclick = () => { store.set("skybee.font", b.dataset.font); applyLook(); draw(); });
     el.querySelectorAll("[data-fontstyle]").forEach(b => b.onclick = () => { store.set("skybee.fontStyle", b.dataset.fontstyle); applyLook(); draw(); });
     el.querySelectorAll("[data-fontfamily]").forEach(b => b.onclick = () => {
-      if (b.dataset.fontfamily === "zakon") {
-        store.set("skybee.fontFamily", "zakon");
+      if (b.dataset.fontfamily === "zakon" || b.dataset.fontfamily === "system") {
+        store.set("skybee.fontFamily", b.dataset.fontfamily);
         activeUserFont = "";
         document.documentElement.style.removeProperty("--skybee-font-family");
       } else if (userFonts.length) {
@@ -645,7 +654,7 @@ export async function appearance(el) {
       if (!id) return;
       await removeUserFont(id);
       userFonts = userFonts.filter(f => f.id !== id);
-      if (store.get("skybee.fontFamily") === "custom:" + id) store.set("skybee.fontFamily", "zakon");
+      if (store.get("skybee.fontFamily") === "custom:" + id) store.set("skybee.fontFamily", "system");
       activeUserFont = "";
       document.documentElement.style.removeProperty("--skybee-font-family");
       applyLook(); await appearance(el);

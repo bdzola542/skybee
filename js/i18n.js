@@ -24,7 +24,6 @@ export const UI_LANGS = [
   ["uk-x-slobozh", "Слобожанський говір", "uk", () => import("./i18n/uk-x-slobozh.js")],
   ["uk-x-step", "Степовий говір", "uk", () => import("./i18n/uk-x-step.js")],
   ["uk-x-naddn", "Середньонаддніпрянський говір", "uk", () => import("./i18n/uk-x-naddn.js")],
-  ["uk-x-surzhyk", "Суржик (жартівливий)", "uk", () => import("./i18n/uk-x-surzhyk.js")],
   ["rue-x-presov", "Русинська (пряшівська)", "uk", () => import("./i18n/rue-x-presov.js")],
   ["rue-x-zakarp", "Русинська (закарпатська)", "uk", () => import("./i18n/rue-x-zakarp.js")],
   ["rue-x-pannon", "Русинська (паннонська)", "uk", () => import("./i18n/rue-x-pannon.js")],

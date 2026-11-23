@@ -1,6 +1,7 @@
 // Skybee — rendering helpers
 import { locale as LOC, t as T } from "./i18n.js";
 import { errText } from "./errors.js";
+import { glassLens } from "./glasslens.js";
 import { session, mutedWords, adultEnabled, labelPref, labelDef, labelName, labelerPref, labelerDids } from "./api.js";
 
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -522,8 +523,32 @@ export function toast(msg, ms = 2500) {
   t.setAttribute("aria-hidden", "true"); // screen readers hear it once, from the live region below
   document.body.appendChild(t);
   announce(msg);
+  if (document.documentElement.dataset.ui !== "material" && !calmMotion()) islandToast(t, ms);
   setTimeout(() => t.classList.add("out"), ms);
   setTimeout(() => t.remove(), ms + 400);
+}
+
+/* "Morph island": the toast is a little dot that grows into its pill (width 380/24, height 300/22) and folds back before it goes. */
+function islandToast(t, ms) {
+  const inner = document.createElement("span"); inner.className = "tin"; inner.innerHTML = t.innerHTML; t.innerHTML = ""; t.appendChild(inner);
+  const W = t.offsetWidth, H = t.offsetHeight, dot = Math.min(H, 40);
+  t.classList.add("island");
+  t.style.width = dot + "px"; t.style.height = dot + "px";
+  let w = dot, wv = 0, wt = W, h = dot, hv = 0, ht = H, o = 0, ov = 0, ot = 1, last = performance.now(), closing = false, raf = 0;
+  const frame = (now) => {
+    const dt = Math.min((now - last) / 1000, 1 / 30); last = now;
+    for (let k = 0; k < 4; k++) {
+      const d = dt / 4;
+      wv += (-380 * (w - wt) - 24 * wv) * d; w += wv * d;
+      hv += (-300 * (h - ht) - 22 * hv) * d; h += hv * d;
+      ov += (-420 * (o - ot) - 32 * ov) * d; o += ov * d;
+    }
+    t.style.width = Math.max(w, 8).toFixed(1) + "px"; t.style.height = Math.max(h, 8).toFixed(1) + "px";
+    inner.style.opacity = Math.max(0, Math.min(1, (w - dot) / Math.max(W - dot, 1) * 1.3 - .15)).toFixed(3);
+    raf = t.isConnected ? requestAnimationFrame(frame) : 0;
+  };
+  raf = requestAnimationFrame(frame);
+  setTimeout(() => { closing = true; wt = dot; ht = dot; }, Math.max(ms - 120, 0)); // folds back into the dot, then fades with the usual .out
 }
 
 // canClose() may refuse when the user dismisses the modal (Esc, click outside); onClose() runs whenever it closes
@@ -569,10 +594,62 @@ export function modal(html, { wide = false, canClose, onClose } = {}) {
   return wrap;
 }
 
+/* "Springy input": a button that succeeded folds into a round ✓ pill (300/20), a refused one shakes its head (700/12). */
+export function successPill(btn) {
+  return new Promise((res) => {
+    if (calmMotion() || !btn.isConnected) { btn.textContent = "✓"; return res(); }
+    const r = btn.getBoundingClientRect(), h = r.height;
+    btn.style.width = r.width + "px"; btn.style.overflow = "hidden"; btn.style.paddingLeft = btn.style.paddingRight = "0";
+    btn.innerHTML = `<span style="display:inline-block;transform:scale(.4);opacity:0">✓</span>`;
+    const tick = btn.firstChild;
+    let x = r.width, v = 0, p = 0, pv = 0, last = performance.now(), t0 = last;
+    const frame = (now) => {
+      const dt = Math.min((now - last) / 1000, 1 / 30); last = now;
+      for (let k = 0; k < 4; k++) { const d = dt / 4; v += (-300 * (x - h) - 20 * v) * d; x += v * d; pv += (-520 * (p - 1) - 16 * pv) * d; p += pv * d; }
+      btn.style.width = x.toFixed(1) + "px";
+      tick.style.transform = `scale(${p.toFixed(3)})`; tick.style.opacity = Math.min(1, p).toFixed(2);
+      if (now - t0 < 900 && btn.isConnected) requestAnimationFrame(frame); else res();
+    };
+    requestAnimationFrame(frame);
+  });
+}
+export function shake(el) {
+  if (calmMotion() || !el?.animate) return;
+  el.animate([{ transform: "translateX(0)" }, { transform: "translateX(-9px)" }, { transform: "translateX(8px)" }, { transform: "translateX(-5px)" }, { transform: "translateX(3px)" }, { transform: "translateX(0)" }], { duration: 420, easing: "cubic-bezier(.3,.7,.2,1)" });
+}
+
+// A dangerous action is not confirmed by a tap: the button has to be held (1.2 s, the fill rises; let go early and it springs back —
+// "Hold button" study). Anything else is an ordinary confirmation.
+function holdButton(btn, onDone, ms = 1200) {
+  const fill = btn.querySelector(".hold-fill");
+  let p = 0, v = 0, held = false, raf = 0, last = 0, done = false;
+  const frame = (now) => {
+    const dt = Math.min((now - last) / 1000, 1 / 30); last = now;
+    if (held) {
+      p += dt * 1000 / ms; v = 0;
+      if (p >= 1) { p = 1; held = false; done = true; fill.style.transform = "scaleX(1)"; btn.classList.add("done"); raf = 0; setTimeout(onDone, 260); return; }
+    } else for (let k = 0; k < 4; k++) { v += (-260 * p - 14 * v) * dt / 4; p += v * dt / 4; } // let go early: it springs back (260/14)
+    fill.style.transform = `scaleX(${Math.max(0, p).toFixed(4)})`;
+    raf = held || Math.abs(p) > .002 || Math.abs(v) > .02 ? requestAnimationFrame(frame) : 0;
+  };
+  const wake = () => { if (!raf && !done) { last = performance.now(); raf = requestAnimationFrame(frame); } };
+  const start = () => { if (done) return; held = true; btn.classList.add("holding"); wake(); };
+  const stop = () => { held = false; btn.classList.remove("holding"); wake(); };
+  btn.addEventListener("pointerdown", (e) => { if (e.button) return; try { btn.setPointerCapture(e.pointerId); } catch {} start(); });
+  for (const ev of ["pointerup", "pointercancel", "lostpointercapture", "pointerleave"]) btn.addEventListener(ev, stop);
+  btn.addEventListener("contextmenu", (e) => e.preventDefault());
+  btn.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !e.repeat) { e.preventDefault(); start(); } });
+  btn.addEventListener("keyup", (e) => { if (e.key === "Enter" || e.key === " ") stop(); });
+}
+
 export function confirmBox(text, okLabel = "Так", danger = false) {
   return new Promise(res => {
-    const m = modal(`<p>${esc(text)}</p><div class="row end"><button class="ghost" data-x="0">Скасувати</button><button class="btn${danger ? " danger" : ""}" data-x="1">${esc(okLabel)}</button></div>`);
-    m.addEventListener("click", e => { const x = e.target.closest("[data-x]"); if (x) { m.close(); res(x.dataset.x === "1"); } });
+    const ok = danger
+      ? `<button class="btn danger holdbtn" data-hold aria-describedby="holdhint"><span class="hold-fill" aria-hidden="true"></span><span class="hold-l">${esc(okLabel)}</span></button>`
+      : `<button class="btn" data-x="1">${esc(okLabel)}</button>`;
+    const m = modal(`<p>${esc(text)}</p>${danger ? `<p class="muted small" id="holdhint">Утримуйте кнопку, щоб підтвердити</p>` : ""}<div class="row end"><button class="ghost" data-x="0">Скасувати</button>${ok}</div>`, { onClose: () => res(false) });
+    m.addEventListener("click", e => { const x = e.target.closest("[data-x]"); if (x) { res(x.dataset.x === "1"); m.close(); } }); // answer first: close() runs onClose, which says «no»
+    const h = m.querySelector("[data-hold]"); if (h) holdButton(h, () => { res(true); m.close(); });
   });
 }
 
@@ -627,12 +704,13 @@ export function closeMenu() {
 // ⬇ saves the full-size file; ✕, Esc or a click beside the photo closes it
 export function lightbox(urls, i = 0, alts = []) {
   const m = modal(`<div class="lb"><div class="lb-bar"><span class="lb-n small"></span><div class="grow"></div>
-      <button class="lb-btn" data-lb="save" title="Зберегти фото" aria-label="Зберегти фото">⬇</button><button class="lb-btn" data-lb="close" title="Закрити" aria-label="Закрити">✕</button></div>
+      <button class="lb-btn" data-lb="lens" title="Скляна лупа" aria-label="Скляна лупа" aria-pressed="false">🔍</button><button class="lb-btn" data-lb="save" title="Зберегти фото" aria-label="Зберегти фото">⬇</button><button class="lb-btn" data-lb="close" title="Закрити" aria-label="Закрити">✕</button></div>
     <div class="lb-stage"><img src="${esc(urls[i])}" alt="" draggable="false"></div><p class="alt" aria-hidden="true"></p>
     ${urls.length > 1 ? `<button class="lb-prev" title="Попереднє фото" aria-label="Попереднє фото">‹</button><button class="lb-next" title="Наступне фото" aria-label="Наступне фото">›</button>` : ""}</div>`, { wide: true });
   m.classList.add("dark");
   const img = m.querySelector("img"), alt = m.querySelector(".alt"), stage = m.querySelector(".lb-stage");
   let z = 1, x = 0, y = 0;
+  const lens = glassLens(m, img); // the glass magnifier (button 🔍): while it is on, the photo is not swiped or zoomed
   const apply = () => {
     if (z > 1) { // the photo cannot be dragged off the screen: its edge stops at the edge of the window
       const r = stage.getBoundingClientRect(), mx = Math.max(0, (img.offsetWidth * z - r.width) / 2), my = Math.max(0, (img.offsetHeight * z - r.height) / 2);
@@ -662,13 +740,14 @@ export function lightbox(urls, i = 0, alts = []) {
   const go = (n) => { i = (i + n + urls.length) % urls.length; show(); };
   let bare = false; // the finger went down beside the photo (pointer capture would make every click look like one on the stage)
   stage.addEventListener("pointerdown", (e) => {
+    if (lens.isOn()) return;
     if (!ptr.size) bare = e.target === stage;
     ptr.set(e.pointerId, { x: e.clientX, y: e.clientY }); stage.setPointerCapture?.(e.pointerId);
     if (ptr.size === 1) { moved = false; swipe = z > 1 ? { px: e.clientX - x, py: e.clientY - y, pan: true } : { sx: e.clientX, sy: e.clientY, dx: 0 }; img.style.transition = "none"; }
     if (ptr.size === 2) { const m2 = mid(); pinch = { d: m2.d, z, mx: m2.x, my: m2.y }; swipe = null; moved = true; }
   });
   stage.addEventListener("pointermove", (e) => {
-    if (!ptr.has(e.pointerId)) return;
+    if (lens.isOn() || !ptr.has(e.pointerId)) return;
     ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pinch && ptr.size >= 2) {
       const m2 = mid();
@@ -709,6 +788,8 @@ export function lightbox(urls, i = 0, alts = []) {
   };
   document.addEventListener("keydown", arrows);
   m.querySelector("[data-lb=close]").addEventListener("click", () => m.close());
+  const lensBtn = m.querySelector("[data-lb=lens]");
+  lensBtn.addEventListener("click", () => { const on = lens.toggle(); lensBtn.setAttribute("aria-pressed", on); lensBtn.classList.toggle("on", on); });
   m.querySelector("[data-lb=save]").addEventListener("click", async () => {
     const url = urls[i];
     const extOf = (t) => ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif", "image/avif": "avif" }[t] || "jpg"); // only a picture's type: a server could call anything «text/html»
